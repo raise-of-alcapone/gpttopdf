@@ -3,73 +3,30 @@ from io import BytesIO
 import re
 import html
 import markdown
-import pdfkit
+from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter, PdfReader
-import os
-from pathlib import Path
 
 app = Flask(__name__)
 
-# pdfkit-Konfiguration für Windows und Linux/Render.com
-def get_pdfkit_config():
-    """Konfiguriert pdfkit basierend auf dem Betriebssystem und Umgebung"""
-    
-    # Render.com / Linux Environment
-    if os.name == 'posix':  # Linux/Unix
-        # Standard Linux-Pfade prüfen
-        possible_linux_paths = [
-            '/usr/bin/wkhtmltopdf',
-            '/usr/local/bin/wkhtmltopdf',
-            '/opt/bin/wkhtmltopdf'
-        ]
-        
-        for path in possible_linux_paths:
-            if os.path.exists(path):
-                print(f"✅ wkhtmltopdf gefunden: {path}")
-                return pdfkit.configuration(wkhtmltopdf=path)
-        
-        # Fallback: PATH verwenden
-        try:
-            import subprocess
-            result = subprocess.run(['which', 'wkhtmltopdf'], 
-                                  capture_output=True, text=True)
-            if result.returncode == 0:
-                path = result.stdout.strip()
-                print(f"✅ wkhtmltopdf im PATH gefunden: {path}")
-                return pdfkit.configuration(wkhtmltopdf=path)
-        except:
-            pass
-    
-    # Windows Environment    
-    elif os.name == 'nt':  # Windows
-        wkhtmltopdf_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-        if os.path.exists(wkhtmltopdf_path):
-            return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
-    
-    # Default fallback
-    print("⚠️ Verwende Standard-pdfkit-Konfiguration")
-    return pdfkit.configuration()
-
 def clean_heading_text(text):
-    """Entfernt Markdown-Formatierungszeichen aus Überschriften für saubere Bookmarks"""
+    """Remove Markdown formatting from headings for clean bookmarks"""
     if not text:
         return text
     
-    # Entferne Markdown-Formatierungen
     cleaned = text
     
-    # Fett-Formatierung entfernen: **text** und __text__
+    # Remove bold formatting: **text** and __text__
     cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)
     cleaned = re.sub(r'__([^_]+)__', r'\1', cleaned)
     
-    # Kursiv-Formatierung entfernen: *text* und _text_
+    # Remove italic formatting: *text* and _text_
     cleaned = re.sub(r'\*([^*]+)\*', r'\1', cleaned)
     cleaned = re.sub(r'_([^_]+)_', r'\1', cleaned)
     
-    # Code-Formatierung entfernen: `text`
+    # Remove code formatting: `text`
     cleaned = re.sub(r'`([^`]+)`', r'\1', cleaned)
     
-    # Strikethrough entfernen: ~~text~~
+    # Remove strikethrough: ~~text~~
     cleaned = re.sub(r'~~([^~]+)~~', r'\1', cleaned)
     
     # Links entfernen: [text](url) -> text
@@ -97,42 +54,40 @@ def clean_heading_text(text):
     return cleaned
 
 def add_simple_bookmarks(pdf_buffer, document_data):
-    """Fügt hierarchische Bookmarks hinzu - einfach und sauber"""
+    """Add hierarchical bookmarks to PDF - simple and reliable"""
     try:
-        # PDF lesen
+        # Read PDF
         pdf_buffer.seek(0)
         reader = PdfReader(pdf_buffer)
         writer = PdfWriter()
         
-        # Alle Seiten kopieren
+        # Copy all pages
         for page in reader.pages:
             writer.add_page(page)
         
-        # Hierarchische Bookmarks
+        # Hierarchical bookmarks
         parent_bookmarks = {}  # level -> bookmark_reference
         
-        # Haupttitel als Level 1
+        # Main title as Level 1
         if document_data.get('title'):
-            clean_title = document_data['title']
-            main_bookmark = writer.add_outline_item(clean_title, 0)
+            main_bookmark = writer.add_outline_item(document_data['title'], 0)
             parent_bookmarks[1] = main_bookmark
         
-        # Durch alle Blöcke gehen
+        # Process all blocks
         for block in document_data.get('blocks', []):
-            # Block-Titel als Level 2
+            # Block title as Level 2
             if block.get('title'):
                 title = block['title']
-                clean_title = title
-                parent = parent_bookmarks.get(1)  # Unter Haupttitel
-                block_bookmark = writer.add_outline_item(clean_title, 0, parent=parent)
+                parent = parent_bookmarks.get(1)  # Under main title
+                block_bookmark = writer.add_outline_item(title, 0, parent=parent)
                 parent_bookmarks[2] = block_bookmark
                 
-                # Alle tieferen Level zurücksetzen
+                # Reset deeper levels
                 for level in list(parent_bookmarks.keys()):
                     if level > 2:
                         del parent_bookmarks[level]
             
-            # Markdown-Überschriften extrahieren
+            # Extract Markdown headings
             if block.get('type') == 'markdown' and block.get('content'):
                 content = block['content']
                 lines = content.split('\n')
@@ -140,7 +95,7 @@ def add_simple_bookmarks(pdf_buffer, document_data):
                 for line in lines:
                     line = line.strip()
                     if line.startswith('#'):
-                        # Level bestimmen
+                        # Determine level
                         level = 0
                         for char in line:
                             if char == '#':
@@ -148,55 +103,54 @@ def add_simple_bookmarks(pdf_buffer, document_data):
                             else:
                                 break
                         
-                        # Text extrahieren und bereinigen
+                        # Extract and clean text
                         text = line[level:].strip()
                         if text:
                             clean_text = text.replace('**', '').replace('*', '').replace('`', '')
                             
-                            # Level anpassen (# wird zu Level 3, ## zu Level 4, etc.)
+                            # Adjust level (# becomes Level 3, ## becomes Level 4, etc.)
                             bookmark_level = level + 2
                             
-                            # Parent finden
+                            # Find parent
                             parent = None
                             for parent_level in range(bookmark_level - 1, 0, -1):
                                 if parent_level in parent_bookmarks:
                                     parent = parent_bookmarks[parent_level]
                                     break
                             
-                            # Bookmark hinzufügen
+                            # Add bookmark
                             bookmark = writer.add_outline_item(clean_text, 0, parent=parent)
                             parent_bookmarks[bookmark_level] = bookmark
                             
-                            # Tiefere Level zurücksetzen
+                            # Reset deeper levels
                             for level_key in list(parent_bookmarks.keys()):
                                 if level_key > bookmark_level:
                                     del parent_bookmarks[level_key]
         
-        # PDF erstellen
+        # Create PDF
         output_buffer = BytesIO()
         writer.write(output_buffer)
         output_buffer.seek(0)
         return output_buffer
         
     except Exception as e:
-        # Bei Fehlern Original zurückgeben
+        # Return original on error
         pdf_buffer.seek(0)
         return pdf_buffer
 
 def create_pdf_from_html(document_data):
-    """Erstellt ein PDF mit pdfkit/wkhtmltopdf - vollständige Emoji-Unterstützung"""
+    """Create PDF directly from HTML/CSS - for Advanced Markdown Editor"""
     try:
-        # HTML-Inhalt für Markdown zusammenbauen
+        # Build HTML content for Markdown
         content_html = ""
         
-        # Titel hinzufügen
+        # Add title
         if document_data.get('title'):
-            # Titel direkt verwenden - pdfkit unterstützt Emojis nativ
             title = html.escape(document_data['title'])
-            # Eindeutige ID für Bookmark-Navigation
+            # Unique ID for bookmark navigation
             content_html += f'<h1 id="title-bookmark" style="color: #1e3a8a; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">{title}</h1>\n'
         
-        # Blöcke verarbeiten - für Markdown-Blöcke
+        # Process blocks - for Markdown blocks
         block_counter = 0
         for block in document_data.get('blocks', []):
             block_type = block.get('type', 'markdown')
@@ -208,45 +162,41 @@ def create_pdf_from_html(document_data):
             
             block_counter += 1
             
-            # Block-Titel hinzufügen falls vorhanden
+            # Add block title if present
             if block_title.strip():
-                # Titel direkt verwenden - pdfkit unterstützt Emojis nativ
                 escaped_title = html.escape(block_title)
-                # H2 für bessere Gliederung
+                # H2 for better structure - real HTML tag for Playwright
                 content_html += f'<h2 id="block-{block_counter}" style="color: #1e3a8a; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">{escaped_title}</h2>\n'
             
-            # Block-Inhalt je nach Typ verarbeiten
+            # Process block content by type
             if block_type == 'markdown':
-                # Markdown serverseitig zu HTML konvertieren für korrekte Überschriften
+                # Convert Markdown to HTML server-side for correct headings
                 if block_content.strip():
-                    # Markdown direkt konvertieren - pdfkit unterstützt Emojis nativ
-                    
-                    # Markdown zu HTML konvertieren
+                    # Convert Markdown to HTML
                     md = markdown.Markdown(extensions=[
                         'tables', 
                         'fenced_code'
                     ])
                     html_content = md.convert(block_content)
                     
-                    # Manuell IDs zu Überschriften hinzufügen für Bookmarks
+                    # Manually add IDs to headings for bookmarks
                     import re
                     def add_heading_ids(match):
                         level = len(match.group(1))
                         text = match.group(2)
-                        # Einfache ID aus dem Text generieren
+                        # Generate simple ID from text
                         heading_id = re.sub(r'[^a-zA-Z0-9]', '-', text.lower()).strip('-')
                         return f'<h{level} id="heading-{block_counter}-{heading_id}">{text}</h{level}>'
                     
-                    # Regex für <h1>text</h1> bis <h6>text</h6>
+                    # Regex for <h1>text</h1> to <h6>text</h6>
                     html_content = re.sub(r'<h([1-6])>([^<]+)</h[1-6]>', add_heading_ids, html_content)
                     
                     content_html += f'{html_content}\n'
             elif block_type == 'code':
-                # Code direkt verwenden - pdfkit unterstützt Emojis nativ
                 escaped_content = html.escape(block_content)
                 content_html += f'<pre style="background: #f5f5f5; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 15px 0;"><code>{escaped_content}</code></pre>\n'
         
-        # HTML-Template mit optimaler Emoji-Unterstützung erstellen
+        # Create HTML template (for Markdown with marked.js)
         full_html = f"""
         <!DOCTYPE html>
         <html lang="de">
@@ -260,7 +210,7 @@ def create_pdf_from_html(document_data):
                 }}
                 
                 body {{
-                    font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Emoji', 'Segoe UI', Arial, sans-serif;
+                    font-family: 'Segoe UI', Arial, sans-serif;
                     font-size: 11pt;
                     line-height: 1.6;
                     color: #333;
@@ -269,12 +219,11 @@ def create_pdf_from_html(document_data):
                     background: white;
                 }}
                 
-                /* Überschriften in blau */
+                /* Headings in blue */
                 h1, h2, h3, h4, h5, h6 {{
                     color: #1e3a8a !important;
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
-                    font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Emoji', 'Segoe UI', Arial, sans-serif;
                 }}
                 
                 h1 {{
@@ -297,7 +246,7 @@ def create_pdf_from_html(document_data):
                     color: #6c757d;
                 }}
                 
-                /* Tabellen */
+                /* Tables */
                 table {{
                     width: 100%;
                     border-collapse: collapse;
@@ -347,7 +296,7 @@ def create_pdf_from_html(document_data):
                     color: inherit;
                 }}
                 
-                /* Listen */
+                /* Lists */
                 ul, ol {{
                     margin: 1rem 0;
                     padding-left: 2rem;
@@ -357,7 +306,7 @@ def create_pdf_from_html(document_data):
                     margin: 0.5rem 0;
                 }}
                 
-                /* Absätze */
+                /* Paragraphs */
                 p {{
                     margin-bottom: 1rem;
                     text-align: justify;
@@ -375,96 +324,44 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit pdfkit/wkhtmltopdf erstellen (vollständige Emoji-Unterstützung)
-        try:
-            # Konfiguration für das aktuelle System
-            config = get_pdfkit_config()
+        # Generate PDF with Playwright (like a real browser)
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
             
-            # Optionen für wkhtmltopdf mit verbesserter Emoji-Unterstützung
-            options = {
-                'page-size': 'A4',
-                'margin-top': '0.75in',
-                'margin-right': '0.75in',
-                'margin-bottom': '0.75in',
-                'margin-left': '0.75in',
-                'encoding': "UTF-8",
-                'no-outline': None,
-                'enable-local-file-access': None,
-                'disable-smart-shrinking': None,  # Verhindert Emoji-Skalierung
-                'print-media-type': None,         # Bessere CSS-Unterstützung
-                'load-error-handling': 'ignore',  # Ignoriert Schrift-Fehler
-                'load-media-error-handling': 'ignore'
-            }
+            # Load HTML
+            page.set_content(full_html)
             
-            # PDF generieren mit Konfiguration
-            pdf_data = pdfkit.from_string(full_html, False, 
-                                        options=options, 
-                                        configuration=config)
+            # Wait until all fonts are loaded
+            page.wait_for_load_state('networkidle')
+            
+            # Generate PDF with high quality and outline
             pdf_buffer = BytesIO()
-            pdf_buffer.write(pdf_data)
+            pdf_bytes = page.pdf(
+                format='A4',
+                margin={
+                    'top': '0.5cm',
+                    'right': '2cm', 
+                    'bottom': '2cm',
+                    'left': '2cm'
+                },
+                print_background=True,
+                prefer_css_page_size=True,
+                outline=False,  # Disabled, use manual bookmarks
+                display_header_footer=False
+            )
+            pdf_buffer.write(pdf_bytes)
             pdf_buffer.seek(0)
             
-            print("✅ PDF erfolgreich mit pdfkit erstellt")
-            
-        except Exception as e:
-            print(f"❌ pdfkit Error: {str(e)}")
-            print("🔄 Versuche Fallback-Lösung...")
-            
-            # Fallback: Erstelle ein einfaches HTML-basiertes PDF
-            try:
-                # Vereinfachte HTML-Version für Fallback
-                simple_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>PDF Fallback</title>
-                    <style>
-                        body {{ 
-                            font-family: Arial, sans-serif; 
-                            padding: 20px; 
-                            line-height: 1.6; 
-                        }}
-                        h1 {{ color: #1e3a8a; }}
-                    </style>
-                </head>
-                <body>
-                    <h1>⚠️ PDF Fallback Mode</h1>
-                    <p>Das ursprüngliche PDF konnte nicht erstellt werden.</p>
-                    <p>Grund: wkhtmltopdf nicht verfügbar auf diesem System.</p>
-                    <hr>
-                    {content_html}
-                </body>
-                </html>
-                """
-                
-                # Minimales PDF erstellen
-                pdf_buffer = BytesIO()
-                pdf_buffer.write(simple_html.encode('utf-8'))
-                pdf_buffer.seek(0)
-                print("⚠️ Fallback-HTML erstellt")
-                
-            except Exception as fallback_error:
-                print(f"❌ Auch Fallback fehlgeschlagen: {fallback_error}")
-                # Letzter Fallback - minimales PDF
-                pdf_buffer = BytesIO()
-                pdf_buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
-                pdf_buffer.seek(0)
-                return pdf_buffer
+            browser.close()
         
-        # Einfache Bookmarks hinzufügen - garantiert funktionierend
+        # Add simple bookmarks - guaranteed working
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
         
         return pdf_buffer
         
     except Exception as e:
-        # Debug-Output für pdfkit-Fehler
-        print(f"PDFKIT ERROR: {str(e)}")
-        print(f"Error type: {type(e).__name__}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
-        
-        # Einfacher Fallback - leeres PDF
+        # Simple fallback - empty PDF
         buffer = BytesIO()
         buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
         buffer.seek(0)
@@ -472,29 +369,29 @@ def create_pdf_from_html(document_data):
 
 @app.route('/')
 def index():
-    """Hauptseite der Anwendung"""
+    """Main page of the application"""
     return render_template('index.html')
 
 @app.route('/favicon.ico')
 def favicon():
-    """Favicon Route"""
+    """Favicon route"""
     return send_file('static/favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/create_pdf', methods=['POST'])
 def create_pdf():
-    """Moderne PDF-Generierung für Advanced Markdown Editor"""
+    """Modern PDF generation for Advanced Markdown Editor"""
     try:
         document_data = request.json
         
         pdf_buffer = create_pdf_from_html(document_data)
         
-        # Dateiname aus Titel ableiten
+        # Derive filename from title
         title = document_data.get('title', '').strip()
         if not title:
-            title = 'DokumentOhneNamen'
+            title = 'DocumentWithoutName'
         safe_title = re.sub(r'[^\w\s-]', '', title).strip()
         safe_title = re.sub(r'[-\s]+', '_', safe_title)
-        filename = f"{safe_title or 'dokument'}.pdf"
+        filename = f"{safe_title or 'document'}.pdf"
         
         return send_file(
             pdf_buffer,

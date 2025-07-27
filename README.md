@@ -1,101 +1,178 @@
 # GPT zu PDF Converter
 
-Eine Flask-Webanwendung zur Erstellung strukturierter PDF-Dokumente aus Web-Inhalten.
+Eine moderne Flask-Webanwendung zur Erstellung professioneller PDF-Dokumente aus Markdown-Inhalten mit hierarchischen Bookmarks.
 
 ## Features
 
-- 📝 **Rich-Text-Editor** mit Formatierungsoptionen
-- 🧱 **Modulare Bausteine** (Text, Überschriften, Code)
+- 📝 **Advanced Markdown Editor** mit EasyMDE
+- 🧱 **Modulare Bausteine** für strukturierte Dokumente
 - 🔄 **Drag & Drop** zum Sortieren der Blöcke
-- 👁️ **Live-Vorschau** des Dokuments
-- 📄 **PDF-Export** mit professionellem Layout
+- 👁️ **Live-Vorschau** mit Syntax-Highlighting
+- 📄 **PDF-Export** mit Playwright (hochwertige Ausgabe)
+- 🔖 **Hierarchische Bookmarks** für Navigation
 - 💻 **Responsive Web-Interface**
 
 ## Installation
 
-1. **Repository klonen oder Dateien herunterladen**
+### 1. Repository klonen
+```bash
+git clone <repository-url>
+cd gpttopdf
+```
 
-2. **Python-Umgebung einrichten** (empfohlen: Virtual Environment)
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   ```
+### 2. Python Virtual Environment erstellen
+```bash
+python -m venv .venv
+```
 
-3. **Abhängigkeiten installieren**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 3. Virtual Environment aktivieren
+**Windows:**
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-4. **Anwendung starten**
-   ```bash
-   python app.py
-   ```
+**Linux/Mac:**
+```bash
+source .venv/bin/activate
+```
 
-5. **Browser öffnen** und zu `http://127.0.0.1:5000` navigieren
+### 4. Abhängigkeiten installieren
+```bash
+pip install -r requirements.txt
+```
+
+### 5. Playwright Browser installieren
+```bash
+playwright install chromium
+```
+
+### 6. Anwendung starten
+```bash
+python app.py
+```
+
+### 7. Browser öffnen
+Navigiere zu `http://127.0.0.1:5000`
+
+## Abhängigkeiten
+
+- **Flask 3.0.3** - Web Framework
+- **Playwright 1.48.0** - Browser-Engine für PDF-Generierung
+- **PyPDF 4.3.1** - PDF-Manipulation für Bookmarks
+- **Markdown 3.7** - Markdown-zu-HTML-Konvertierung
 
 ## Verwendung
 
 ### Dokument erstellen
 
-1. **Titel eingeben** (optional) im oberen Bereich
-2. **Blöcke hinzufügen** über die Toolbar-Buttons:
-   - **Text Block**: Für normalen Text mit Formatierung
-   - **Überschrift**: Für Kapitelüberschriften  
+1. **Titel eingeben** im Haupttitel-Feld
+2. **Blöcke hinzufügen**:
+   - **Markdown Block**: Für formatierten Text mit Markdown-Syntax
    - **Code Block**: Für Programmcode
-3. **Inhalte eingeben** in den Rich-Text-Editoren
-4. **Blöcke sortieren** per Drag & Drop mit dem ⋮⋮ Symbol
-5. **Live-Vorschau** in der rechten Seitenleiste betrachten
+3. **Inhalte bearbeiten** mit dem integrierten Editor
+4. **Blöcke sortieren** per Drag & Drop
+5. **Live-Vorschau** betrachten
 
 ### PDF generieren
 
-- Button **"PDF Generieren"** klicken
-- PDF wird automatisch heruntergeladen
-- Dateiname enthält Zeitstempel
+Klicke den **"PDF Generieren"** Button - das PDF wird automatisch heruntergeladen.
+
+### Markdown-Unterstützung
+
+Der Editor unterstützt vollständige Markdown-Syntax:
+- **Überschriften**: `# H1`, `## H2`, `### H3`, etc.
+- **Formatierung**: `**fett**`, `*kursiv*`, `~~durchgestrichen~~`
+- **Listen**: Bullet-Points und nummerierte Listen
+- **Code**: `inline code` und Code-Blöcke
+- **Links**: `[Text](URL)`
+- **Tabellen**: Pipe-separierte Tabellen
+- **Blockquotes**: `> Zitat`
 
 ### Block-Funktionen
 
-- **Duplizieren**: Block kopieren mit dem 📋 Symbol
-- **Löschen**: Block entfernen mit dem 🗑️ Symbol
-- **Block-Titel**: Optionaler Titel für jeden Block
-- **Formatierung**: Fett, kursiv, Listen, Links (außer Code-Blöcke)
+- **Hinzufügen**: Neue Blöcke über die Toolbar
+- **Sortieren**: Drag & Drop mit dem ⋮⋮ Handle
+- **Löschen**: ✕ Button am Block-Header
+- **Collapse/Expand**: Blöcke ein-/ausklappen
+- **Block-Titel**: Optionale Titel für bessere Organisation
 
 ## Technische Details
 
-### Backend (Flask)
-- **PDF-Generierung** mit ReportLab
-- **HTML-zu-PDF Konvertierung** mit Text-Bereinigung
-- **REST-API** für PDF-Export
-- **Styles** für verschiedene Content-Typen
+### PDF-Generierung
+- **Playwright** rendert HTML/CSS wie ein echter Browser
+- **PyPDF** fügt hierarchische Bookmarks hinzu
+- **Markdown-zu-HTML** Konvertierung mit syntax highlighting
+- **A4-Format** mit professionellem Layout
 
-### Frontend
-- **Bootstrap 5** für responsives Design
-- **Quill.js** für Rich-Text-Editoren
+### Frontend-Technologien
+- **Bootstrap 5** für responsive UI
+- **EasyMDE** für Markdown-Editor
 - **SortableJS** für Drag & Drop
 - **Font Awesome** für Icons
 
 ### PDF-Features
-- **A4-Format** mit professionellen Rändern
-- **Verschiedene Styles** für Text, Überschriften, Code
-- **Automatische Formatierung** und Spacing
-- **Zeitstempel** in Dateinamen
+- **Hierarchische Bookmarks** für Navigation
+- **Professionelles Styling** mit CSS
+- **Syntax Highlighting** für Code-Blöcke
+- **Responsive Tabellen** und Listen
+- **Automatische Seitennummerierung**
 
-## Erweiterungsmöglichkeiten
+## Deployment (Linux VPS)
 
-- **Zusätzliche Block-Typen** (Bilder, Tabellen, etc.)
-- **Themes/Templates** für verschiedene Dokumenttypen
-- **Export-Formate** (Word, HTML, etc.)
-- **Speichern/Laden** von Dokumenten
-- **Collaboration-Features**
-- **Mehr PDF-Optionen** (Seitenzahlen, Headers, etc.)
+### Systemabhängigkeiten installieren
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# Browser-Abhängigkeiten für Playwright
+sudo apt install libnss3 libnspr4 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2
+```
+
+### Anwendung einrichten
+```bash
+# Repository klonen
+git clone <your-repo>
+cd gpttopdf
+
+# Virtual Environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Abhängigkeiten installieren
+pip install -r requirements.txt
+playwright install chromium
+
+# Produktionsmodus starten
+python app.py
+```
+
+### Mit Gunicorn (empfohlen)
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
 
 ## Fehlerbehebung
 
-### Häufige Probleme
+### Playwright-Probleme
+```bash
+# Browser neu installieren
+playwright install chromium
 
-**PDF wird nicht generiert:**
-- Prüfen Sie die Browser-Konsole auf Fehler
-- Stellen Sie sicher, dass ReportLab installiert ist
-- Prüfen Sie, ob mindestens ein Block oder Titel vorhanden ist
+# Systemabhängigkeiten prüfen
+playwright install-deps chromium
+```
+
+### PDF-Generierung fehlschlägt
+- Prüfe Browser-Konsole auf JavaScript-Fehler
+- Stelle sicher, dass Chromium installiert ist
+- Prüfe Server-Logs für Python-Fehler
+
+### Performance optimieren
+- Für Produktion: `app.run(debug=False)`
+- Gunicorn mit mehreren Workern verwenden
+- Reverse Proxy (nginx) für statische Dateien
 
 **Layout-Probleme:**
 - Browser-Cache leeren

@@ -1,3 +1,9 @@
+# Virtual Environment
+.venv/
+.venv_*/
+venv/
+env/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,49 +22,23 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Flask
-instance/
-.webassets-cache
-
-# Environment variables
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
 # IDE
-.vscode/
+.vscode/settings.json
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
 
-# Test coverage
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
+# Temporary files
+*.tmp
+*.temp
