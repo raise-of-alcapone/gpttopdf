@@ -1,8 +1,8 @@
-FROM python:3.11-slim
+FROM python:3.11-slim as base
 
 WORKDIR /app
 
-# System dependencies (cached until Dockerfile changes)
+# System dependencies
 RUN apt-get update && apt-get install -y \
     wget gnupg curl fonts-liberation libappindicator3-1 \
     libasound2 libatk-bridge2.0-0 libdrm2 libgtk-3-0 \
@@ -11,29 +11,34 @@ RUN apt-get update && apt-get install -y \
     libcairo-gobject2 libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create user FIRST (rarely changes)
+# Create user
 RUN useradd -m -u 1000 appuser
 
-# Python dependencies (cached until requirements.txt changes)
+# Browser Cache Stage
+FROM base as browser-cache
+
+# Python deps for playwright
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir playwright
 
-# Playwright system dependencies (cached until Dockerfile changes)
-RUN playwright install-deps chromium
-
-# Install Chromium as root to cache in system location
-# This way it survives user switches and gets cached
+# Install Chromium in system location for better caching
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/playwright
 RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
+    playwright install-deps chromium && \
     playwright install chromium && \
     chmod -R 755 $PLAYWRIGHT_BROWSERS_PATH
 
-# App code (changes frequently - put LAST for minimal rebuilds)
+# Final Stage
+FROM browser-cache as final
+
+# Install all Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# App code (last for best cache utilization)
 COPY . .
 RUN chown -R appuser:appuser /app
 
-# Switch to user for runtime
 USER appuser
-
 EXPOSE 5000
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
