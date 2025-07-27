@@ -406,4 +406,11 @@ if __name__ == '__main__':
     import os
     # Production vs Development
     debug_mode = os.getenv('FLASK_ENV') != 'production'
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    
+    if debug_mode:
+        # Development mode with Flask dev server
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        # Production mode - should be run with Gunicorn
+        print("Production mode detected. Please use Gunicorn:")
+        print("gunicorn --config gunicorn.conf.py app:app")
