@@ -9,9 +9,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.units import cm
-from reportlab.lib.colors import blue, black
+from reportlab.lib.colors import blue, black, darkblue
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
 import textwrap
-from playwright.sync_api import sync_playwright
+import re as regex
+# from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 
@@ -145,6 +147,60 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         # Bei Fehlern Original zurückgeben
         pdf_buffer.seek(0)
         return pdf_buffer
+
+def convert_html_to_reportlab(html_content):
+    """Konvertiert HTML zu reportlab-kompatiblen Paragraph-Objekten"""
+    import re
+    
+    # HTML-Tags entfernen und in Textblöcke aufteilen
+    paragraphs = []
+    
+    # Code-Blöcke extrahieren
+    code_pattern = r'<pre><code[^>]*>(.*?)</code></pre>'
+    code_blocks = re.findall(code_pattern, html_content, re.DOTALL)
+    
+    # Code-Blöcke temporär ersetzen
+    temp_html = html_content
+    for i, code in enumerate(code_blocks):
+        temp_html = temp_html.replace(f'<pre><code>{code}</code></pre>', f'{{CODE_BLOCK_{i}}}', 1)
+        temp_html = temp_html.replace(f'<pre><code class="language-python">{code}</code></pre>', f'{{CODE_BLOCK_{i}}}', 1)
+    
+    # Überschriften extrahieren
+    heading_pattern = r'<h([1-6])[^>]*>(.*?)</h[1-6]>'
+    headings = re.findall(heading_pattern, temp_html, re.DOTALL)
+    
+    # Überschriften temporär ersetzen
+    for level, heading in headings:
+        clean_heading = re.sub(r'<[^>]+>', '', heading).strip()
+        temp_html = temp_html.replace(f'<h{level}>{heading}</h{level}>', f'{{HEADING_{clean_heading}}}', 1)
+    
+    # Paragraphen aufteilen
+    temp_html = re.sub(r'<[^>]+>', '', temp_html)  # Alle HTML-Tags entfernen
+    parts = temp_html.split('\n')
+    
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+            
+        # Code-Blöcke wieder einsetzen
+        if '{CODE_BLOCK_' in part:
+            code_index = int(re.search(r'CODE_BLOCK_(\d+)', part).group(1))
+            if code_index < len(code_blocks):
+                code_text = code_blocks[code_index].strip()
+                paragraphs.append({'type': 'code', 'text': code_text})
+        # Überschriften wieder einsetzen
+        elif '{HEADING_' in part:
+            heading_text = part.replace('{HEADING_', '').replace('}', '')
+            paragraphs.append({'type': 'heading', 'text': heading_text})
+        # Normaler Text
+        else:
+            # Markdown-Formatierung beibehalten
+            part = part.replace('**', '<b>').replace('**', '</b>')
+            part = part.replace('*', '<i>').replace('*', '</i>')
+            paragraphs.append({'type': 'normal', 'text': part})
+    
+    return paragraphs
 
 def create_pdf_from_html(document_data):
     """Erstellt ein PDF direkt aus HTML/CSS - für Advanced Markdown Editor"""
@@ -332,36 +388,97 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit Playwright erstellen (wie ein echter Browser)
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        # PDF mit reportlab erstellen - vollständige Markdown-Unterstützung
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                               rightMargin=2*cm, leftMargin=2*cm,
+                               topMargin=1*cm, bottomMargin=2*cm)
+        
+        # Styles definieren
+        styles = getSampleStyleSheet()
+        
+        # Custom Styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            textColor=darkblue,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=12,
+            spaceBefore=20,
+            textColor=darkblue,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=12,
+            alignment=TA_JUSTIFY,
+            fontName='Helvetica'
+        )
+        
+        code_style = ParagraphStyle(
+            'CustomCode',
+            parent=styles['Code'],
+            fontSize=9,
+            spaceAfter=12,
+            leftIndent=20,
+            fontName='Courier',
+            backColor='#f5f5f5'
+        )
+        
+        # Story-Array für PDF-Inhalt
+        story = []
+        
+        # Titel hinzufügen
+        if document_data.get('title'):
+            story.append(Paragraph(document_data['title'], title_style))
+            story.append(Spacer(1, 20))
+        
+        # Blöcke verarbeiten
+        for block in document_data.get('blocks', []):
+            block_type = block.get('type', 'markdown')
+            block_content = block.get('content', '')
+            block_title = block.get('title', '')
             
-            # HTML laden
-            page.set_content(full_html)
+            if not block_content.strip() and not block_title.strip():
+                continue
             
-            # Warten bis alle Fonts geladen sind
-            page.wait_for_load_state('networkidle')
+            # Block-Titel hinzufügen
+            if block_title.strip():
+                story.append(Paragraph(block_title, heading_style))
             
-            # PDF generieren mit hoher Qualität und Gliederungspunkten
-            pdf_buffer = BytesIO()
-            pdf_bytes = page.pdf(
-                format='A4',
-                margin={
-                    'top': '0.5cm',
-                    'right': '2cm', 
-                    'bottom': '2cm',
-                    'left': '2cm'
-                },
-                print_background=True,
-                prefer_css_page_size=True,
-                outline=False,  # Deaktiviert, verwende manuelle Bookmarks
-                display_header_footer=False
-            )
-            pdf_buffer.write(pdf_bytes)
-            pdf_buffer.seek(0)
+            if block_content.strip():
+                # Markdown zu HTML konvertieren
+                html_content = markdown.markdown(block_content, extensions=['tables', 'fenced_code'])
+                
+                # HTML zu reportlab-kompatiblem Text konvertieren
+                processed_content = convert_html_to_reportlab(html_content)
+                
+                # Absätze hinzufügen
+                for paragraph in processed_content:
+                    if paragraph['type'] == 'heading':
+                        story.append(Paragraph(paragraph['text'], heading_style))
+                    elif paragraph['type'] == 'code':
+                        story.append(Paragraph(paragraph['text'], code_style))
+                    else:
+                        story.append(Paragraph(paragraph['text'], normal_style))
             
-            browser.close()
+            story.append(Spacer(1, 15))
+        
+        # PDF erstellen
+        doc.build(story)
+        pdf_buffer.seek(0)
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
