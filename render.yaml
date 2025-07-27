@@ -2,7 +2,7 @@ services:
   - type: web
     name: gpttopdf
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && chmod +x bin/post_compile && bin/post_compile
     startCommand: gunicorn app:app --timeout 120
     envVars:
       - key: PYTHON_VERSION
