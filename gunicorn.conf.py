@@ -16,10 +16,10 @@ keepalive = 2
 max_requests = 1000
 max_requests_jitter = 50
 
-# Production Logging
-accesslog = "/app/logs/access.log"
-errorlog = "/app/logs/error.log"
-loglevel = "info"  # info instead of debug for production
+# Logging to stdout/stderr (Docker-friendly)
+accesslog = "-"  # stdout
+errorlog = "-"   # stderr  
+loglevel = "info"
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # Process naming
