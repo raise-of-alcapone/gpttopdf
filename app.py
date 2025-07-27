@@ -325,7 +325,7 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit Playwright erstellen (wie ein echter Browser)
+        # PDF mit Playwright erstellen (Browser-Engine für perfekte HTML/CSS-Darstellung)
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
@@ -333,10 +333,10 @@ def create_pdf_from_html(document_data):
             # HTML laden
             page.set_content(full_html)
             
-            # Warten bis alle Fonts geladen sind
+            # Warten bis alles geladen ist
             page.wait_for_load_state('networkidle')
             
-            # PDF generieren mit hoher Qualität und Gliederungspunkten
+            # PDF generieren
             pdf_buffer = BytesIO()
             pdf_bytes = page.pdf(
                 format='A4',
@@ -348,12 +348,12 @@ def create_pdf_from_html(document_data):
                 },
                 print_background=True,
                 prefer_css_page_size=True,
-                outline=False,  # Deaktiviert, verwende manuelle Bookmarks
+                outline=False,
                 display_header_footer=False
             )
+            
             pdf_buffer.write(pdf_bytes)
             pdf_buffer.seek(0)
-            
             browser.close()
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
