@@ -2,10 +2,12 @@ services:
   - type: web
     name: gpttopdf
     env: python
-    buildCommand: chmod +x build.sh && ./build.sh
+    buildCommand: pip install -r requirements.txt && playwright install chromium
     startCommand: gunicorn app:app --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/project/.cache/ms-playwright
+        value: /opt/render/.cache/ms-playwright
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "0"
