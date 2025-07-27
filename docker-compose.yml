@@ -11,7 +11,7 @@ services:
     image: gpttopdf:latest
     container_name: gpttopdf
     ports:
-      - "5000:5000"  # Extern erreichbar für Debugging
+      - "127.0.0.1:5000:5000"  # NUR lokal erreichbar
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
