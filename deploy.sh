@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deployment script for VPC
+# Simple deployment script for debugging
 # Usage: ./deploy.sh
 
 set -e
@@ -13,20 +13,28 @@ git pull origin main
 
 # Build and restart Docker containers
 echo "🔨 Building Docker image..."
-docker-compose build --no-cache
+docker-compose build --no-cache gpttopdf
 
 echo "🔄 Restarting services..."
-docker-compose down
-docker-compose up -d
+docker-compose stop gpttopdf 2>/dev/null || true
+docker-compose up -d gpttopdf
 
 # Health check
 echo "🏥 Performing health check..."
 sleep 10
 if curl -f http://localhost:5000 >/dev/null 2>&1; then
-    echo "✅ Deployment successful! Service is running."
+    echo "✅ Service is running on localhost:5000"
 else
-    echo "❌ Health check failed. Check logs with: docker-compose logs"
-    exit 1
+    echo "❌ Health check failed. Check logs with: docker-compose logs gpttopdf"
 fi
 
-echo "🎉 Deployment completed successfully!"
+# Status and logs for debugging
+echo "📊 Service status:"
+docker-compose ps gpttopdf
+
+echo "📋 Recent logs:"
+docker-compose logs --tail=20 gpttopdf
+
+echo "✅ Deployment completed!"
+echo "🐛 For debugging: docker-compose logs -f gpttopdf"
+echo "🧪 Test PDF generation: curl http://localhost:5000/debug/test-pdf -o test.pdf"

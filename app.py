@@ -6,6 +6,7 @@ import markdown
 from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter, PdfReader
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -489,8 +490,26 @@ def favicon():
 def debug_test_pdf():
     """Debug route to test PDF generation"""
     import logging
+    import sys
+    import subprocess
+    
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
+    
+    debug_info = {
+        'python_version': sys.version,
+        'working_directory': os.getcwd(),
+        'environment': dict(os.environ),
+        'playwright_browsers': []
+    }
+    
+    try:
+        # Check Playwright installation
+        result = subprocess.run(['playwright', 'install', '--dry-run'], 
+                              capture_output=True, text=True)
+        debug_info['playwright_check'] = result.stdout
+    except Exception as e:
+        debug_info['playwright_error'] = str(e)
     
     try:
         # Test document
@@ -506,6 +525,8 @@ def debug_test_pdf():
         }
         
         logger.info("🧪 Starting debug PDF generation...")
+        logger.info(f"Debug info: {debug_info}")
+        
         pdf_buffer = create_pdf_from_html(test_data)
         
         return send_file(
@@ -516,7 +537,15 @@ def debug_test_pdf():
         )
     except Exception as e:
         logger.error(f"Debug PDF generation failed: {str(e)}")
-        return jsonify({'error': str(e), 'type': type(e).__name__}), 500
+        import traceback
+        full_traceback = traceback.format_exc()
+        
+        return jsonify({
+            'error': str(e), 
+            'type': type(e).__name__,
+            'traceback': full_traceback,
+            'debug_info': debug_info
+        }), 500
 
 @app.route('/create_pdf', methods=['POST'])
 def create_pdf():
