@@ -1,5 +1,5 @@
 flask
-playwright
+playwright install --with-deps chromium
 pypdf
 gunicorn
 markdown
