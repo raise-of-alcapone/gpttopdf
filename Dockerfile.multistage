@@ -1,8 +1,8 @@
-FROM python:3.11-slim
+FROM python:3.11-slim as base
 
 WORKDIR /app
 
-# System dependencies (cached until Dockerfile changes)
+# System dependencies layer (rarely changes)
 RUN apt-get update && apt-get install -y \
     wget gnupg curl fonts-liberation libappindicator3-1 \
     libasound2 libatk-bridge2.0-0 libdrm2 libgtk-3-0 \
@@ -11,21 +11,24 @@ RUN apt-get update && apt-get install -y \
     libcairo-gobject2 libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies (cached until requirements.txt changes)
+# Python dependencies stage (changes when requirements.txt changes)
+FROM base as python-deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Playwright system dependencies (cached until Dockerfile changes)
+# Playwright system dependencies (rarely changes)
+FROM python-deps as playwright-deps
 RUN playwright install-deps chromium
 
-# Create user (rarely changes)
+# User setup stage (rarely changes)
+FROM playwright-deps as user-setup
 RUN useradd -m -u 1000 appuser
 
-# App code (changes frequently - put last for minimal rebuilds)
+# Production stage
+FROM user-setup as production
 COPY . .
 RUN chown -R appuser:appuser /app
 
-# Switch to user and install browser (cached until user or playwright version changes)
 USER appuser
 RUN playwright install chromium
 

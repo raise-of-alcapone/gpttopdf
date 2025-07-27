@@ -2,9 +2,17 @@ version: '3.8'
 
 services:
   gpttopdf:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      # Enable BuildKit for better caching
+      cache_from:
+        - gpttopdf:latest
+      target: production
+    image: gpttopdf:latest
+    container_name: gpttopdf
     ports:
-      - "5000:5000"  # Wieder extern erreichbar für Debugging
+      - "5000:5000"  # Extern erreichbar für Debugging
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1

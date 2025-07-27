@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies (cached until Dockerfile changes)
+# Install system dependencies for Playwright
 RUN apt-get update && apt-get install -y \
     wget gnupg curl fonts-liberation libappindicator3-1 \
     libasound2 libatk-bridge2.0-0 libdrm2 libgtk-3-0 \
@@ -11,23 +11,25 @@ RUN apt-get update && apt-get install -y \
     libcairo-gobject2 libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies (cached until requirements.txt changes)
+# Copy requirements and install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Playwright system dependencies (cached until Dockerfile changes)
+# Install Playwright completely as root
+RUN playwright install chromium
 RUN playwright install-deps chromium
 
-# Create user (rarely changes)
-RUN useradd -m -u 1000 appuser
+# Make Playwright accessible to all users
+RUN chmod -R 755 /root/.cache/ms-playwright
 
-# App code (changes frequently - put last for minimal rebuilds)
+# Create user and copy app
+RUN useradd -m -u 1000 appuser
 COPY . .
 RUN chown -R appuser:appuser /app
 
-# Switch to user and install browser (cached until user or playwright version changes)
+# Run as appuser but with access to root's Playwright
 USER appuser
-RUN playwright install chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 EXPOSE 5000
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
