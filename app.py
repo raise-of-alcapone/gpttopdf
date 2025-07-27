@@ -218,7 +218,7 @@ def create_pdf_from_html(document_data):
                     line-height: 1.6;
                     color: #333;
                     margin: 0;
-                    padding: 0;
+                    padding: 20px;
                     background: white;
                 }}
                 
@@ -227,16 +227,72 @@ def create_pdf_from_html(document_data):
                     color: #1e3a8a;
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
+                    font-weight: bold;
                 }}
                 
                 h1 {{
+                    font-size: 24pt;
                     border-bottom: 2px solid #ddd;
                     padding-bottom: 0.5rem;
+                    text-align: center;
                 }}
                 
-                h2, h3 {{
+                h2 {{
+                    font-size: 18pt;
                     border-bottom: 1px solid #eee;
                     padding-bottom: 0.3rem;
+                }}
+                
+                h3 {{
+                    font-size: 16pt;
+                    border-bottom: 1px solid #eee;
+                    padding-bottom: 0.3rem;
+                }}
+                
+                h4 {{
+                    font-size: 14pt;
+                }}
+                
+                h5 {{
+                    font-size: 12pt;
+                }}
+                
+                h6 {{
+                    font-size: 11pt;
+                }}
+                
+                /* Blockquotes */
+                blockquote {{
+                    border-left: 4px solid #007bff;
+                    margin: 1rem 0;
+                    padding: 0.5rem 1rem;
+                    background-color: #f8f9fa;
+                    font-style: italic;
+                    color: #6c757d;
+                }}
+                
+                /* Tabellen */
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 1rem 0;
+                    font-size: 10pt;
+                }}
+                
+                table th, table td {{
+                    border: 1px solid #ddd;
+                    padding: 8px 12px;
+                    text-align: left;
+                }}
+                
+                table th {{
+                    background-color: #f8f9fa;
+                    font-weight: bold;
+                    color: #495057;
+                }}
+                
+                table tr:nth-child(even) {{
+                    background-color: #f8f9fa;
                 }}
                 
                 /* Code */
@@ -245,22 +301,64 @@ def create_pdf_from_html(document_data):
                     border: 1px solid #e9ecef;
                     border-radius: 4px;
                     padding: 1rem;
-                    font-family: monospace;
-                    font-size: 0.9rem;
+                    font-family: 'Courier New', monospace;
+                    font-size: 9pt;
+                    line-height: 1.4;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
                 }}
                 
                 code {{
                     background: #f8f9fa;
                     padding: 0.2rem 0.4rem;
                     border-radius: 3px;
-                    font-family: monospace;
-                    font-size: 0.9rem;
+                    font-family: 'Courier New', monospace;
+                    font-size: 9pt;
                     color: #e83e8c;
+                }}
+                
+                pre code {{
+                    background: none;
+                    padding: 0;
+                    color: inherit;
+                }}
+                
+                /* Listen */
+                ul, ol {{
+                    margin: 1rem 0;
+                    padding-left: 2rem;
+                }}
+                
+                li {{
+                    margin: 0.3rem 0;
                 }}
                 
                 /* Absätze */
                 p {{
                     margin-bottom: 1rem;
+                    text-align: justify;
+                }}
+                
+                /* Links */
+                a {{
+                    color: #007bff;
+                    text-decoration: underline;
+                }}
+                
+                /* Fett und kursiv */
+                strong, b {{
+                    font-weight: bold;
+                }}
+                
+                em, i {{
+                    font-style: italic;
+                }}
+                
+                /* Horizontal Rules */
+                hr {{
+                    border: none;
+                    border-top: 2px solid #ddd;
+                    margin: 2rem 0;
                 }}
             </style>
         </head>
