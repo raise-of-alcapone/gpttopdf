@@ -3,167 +3,24 @@ from io import BytesIO
 import re
 import html
 import markdown
-import weasyprint
+import pdfkit
 from pypdf import PdfWriter, PdfReader
+import os
+from pathlib import Path
 
 app = Flask(__name__)
 
-# Emoji-zu-Text-Mapping für bessere PDF-Darstellung
-EMOJI_TO_TEXT = {
-    # Häufig verwendete
-    '🎯': '[Ziel]',
-    '🚀': '[Rakete]',
-    '💡': '[Idee]',
-    '⭐': '[Stern]',
-    '✅': '[Häkchen]',
-    '❌': '[Kreuz]',
-    '⚠️': '[Warnung]',
-    '🔥': '[Feuer]',
-    '💪': '[Stark]',
-    '🎉': '[Party]',
+# pdfkit-Konfiguration für Windows
+def get_pdfkit_config():
+    """Konfiguriert pdfkit basierend auf dem Betriebssystem"""
+    if os.name == 'nt':  # Windows
+        # Standard Windows-Installationspfad
+        wkhtmltopdf_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+        if os.path.exists(wkhtmltopdf_path):
+            return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
     
-    # Gesichter
-    '😀': '[Lachen]',
-    '😊': '[Lächeln]',
-    '😍': '[Verliebt]',
-    '🤔': '[Nachdenken]',
-    '😎': '[Cool]',
-    '🙄': '[Augenrollen]',
-    '😅': '[Nervös]',
-    '🤗': '[Umarmung]',
-    '🥳': '[Feier]',
-    '🤩': '[Begeistert]',
-    '🧘‍♂️': '[Meditation]',
-    
-    # Negativ
-    '💩': '[Mist]',
-    '😤': '[Wütend]',
-    '😡': '[Zorn]',
-    '🤬': '[Fluchen]',
-    '😩': '[Erschöpft]',
-    '🤦‍♂️': '[Facepalm-M]',
-    '🤦‍♀️': '[Facepalm-W]',
-    '🙈': '[Nichts-sehen]',
-    '😱': '[Schock]',
-    '💀': '[Totenkopf]',
-    '🤯': '[Explodiert]',
-    '😵': '[Benommen]',
-    
-    # Objekte
-    '📝': '[Notiz]',
-    '📊': '[Diagramm]',
-    '📈': '[Wachstum]',
-    '💻': '[Computer]',
-    '🔧': '[Werkzeug]',
-    '⚙️': '[Einstellung]',
-    '🛠️': '[Reparatur]',
-    '📦': '[Paket]',
-    '🎁': '[Geschenk]',
-    '💼': '[Koffer]',
-    '📋': '[Klemmbrett]',
-    
-    # Symbole
-    '✨': '[Glitzer]',
-    '🌟': '[Glänzend]',
-    '💫': '[Schwindelig]',
-    '🔸': '[Orange-Punkt]',
-    '🔹': '[Blau-Punkt]',
-    '◾': '[Schwarz-Punkt]',
-    '◽': '[Weiß-Punkt]',
-    '🔺': '[Dreieck-hoch]',
-    '🔻': '[Dreieck-runter]',
-    '⬆️': '[Pfeil-hoch]',
-    '➡️': '[Pfeil-rechts]',
-    '🔍': '[Lupe]',
-    '🔁': '[Wiederholen]',
-    '🔄': '[Aktualisieren]',
-    
-    # Medizin
-    '🩹': '[Pflaster]',
-    '❄️': '[Schnee]',
-    '🧠': '[Gehirn]',
-    '🟢': '[Grün-Kreis]',
-    
-    # Natur
-    '🌱': '[Sämling]',
-    '🌳': '[Baum]',
-    '🌊': '[Welle]',
-    '⚡': '[Blitz]',
-    '🌈': '[Regenbogen]',
-    '☀️': '[Sonne]',
-    '🌙': '[Mond]',
-    
-    # Transport
-    '🚗': '[Auto]',
-    '✈️': '[Flugzeug]',
-    '🚢': '[Schiff]',
-    '🚂': '[Zug]',
-    '🛸': '[UFO]',
-    '🚁': '[Hubschrauber]',
-    '🚲': '[Fahrrad]',
-    '🛵': '[Roller]',
-    '🏃': '[Laufen]',
-    
-    # Zeit
-    '⏰': '[Wecker]',
-    '⏳': '[Sanduhr]',
-    '⌛': '[Sanduhr-leer]',
-    '📅': '[Kalender]',
-    '📆': '[Kalender-Blatt]',
-    '🕒': '[3-Uhr]',
-    '⏱️': '[Stoppuhr]',
-    '⏲️': '[Timer]',
-    '🔔': '[Glocke]',
-    '📢': '[Megafon]'
-}
-
-def convert_emojis_for_pdf(text):
-    """Konvertiert Emojis zu lesbarem Text für PDF-Darstellung"""
-    if not text:
-        return text
-    
-    # Emoji-zu-Text-Ersetzung ZUERST
-    for emoji, replacement in EMOJI_TO_TEXT.items():
-        text = text.replace(emoji, replacement)
-    
-    # Aggressive Emoji-Entfernung - alle Unicode-Symbole, die Probleme bereiten
-    # Mehrere Durchgänge für verschiedene Unicode-Bereiche
-    
-    # Standard Emoji-Bereiche
-    emoji_patterns = [
-        r'[\U0001F600-\U0001F64F]+',  # Emoticons
-        r'[\U0001F300-\U0001F5FF]+',  # Symbols & Pictographs
-        r'[\U0001F680-\U0001F6FF]+',  # Transport & Map
-        r'[\U0001F1E0-\U0001F1FF]+',  # Flags
-        r'[\U00002702-\U000027B0]+',  # Dingbats
-        r'[\U000024C2-\U0001F251]+',  # Enclosed characters
-        r'[\U0001F900-\U0001F9FF]+',  # Supplemental Symbols
-        r'[\U0001FA70-\U0001FAFF]+',  # Extended-A
-        r'[\U00002600-\U000026FF]+',  # Miscellaneous Symbols
-        r'[\U00002700-\U000027BF]+',  # More Dingbats
-        r'[\U0001F170-\U0001F251]+',  # Enclosed Alphanumeric
-        r'[\U000FE00-\U000FE0F]+',   # Variation Selectors
-        r'[\U0001F004\U0001F0CF\U0001F18E\U0001F191-\U0001F19A\U0001F1E6-\U0001F1FF\U0001F201\U0001F21A\U0001F22F\U0001F232-\U0001F236\U0001F238-\U0001F23A\U0001F250\U0001F251\U0001F300-\U0001F320\U0001F32D-\U0001F335\U0001F337-\U0001F37C\U0001F37E-\U0001F393\U0001F3A0-\U0001F3CA\U0001F3CF-\U0001F3D3\U0001F3E0-\U0001F3F0\U0001F3F4\U0001F3F8-\U0001F43E\U0001F440\U0001F442-\U0001F4FC\U0001F4FF-\U0001F53D\U0001F54B-\U0001F54E\U0001F550-\U0001F567\U0001F57A\U0001F595\U0001F596\U0001F5A4\U0001F5FB-\U0001F64F\U0001F680-\U0001F6C5\U0001F6CC\U0001F6D0-\U0001F6D2\U0001F6EB\U0001F6EC\U0001F6F4-\U0001F6F9\U0001F910-\U0001F93A\U0001F93C-\U0001F945\U0001F947-\U0001F970\U0001F973-\U0001F976\U0001F97A\U0001F97C-\U0001F9A2\U0001F9B0-\U0001F9B9\U0001F9C0-\U0001F9C2\U0001F9D0-\U0001F9FF]+'
-    ]
-    
-    # Alle Emoji-Pattern durchgehen und durch [Symbol] ersetzen
-    for pattern in emoji_patterns:
-        text = re.sub(pattern, '[Symbol]', text, flags=re.UNICODE)
-    
-    # Zusätzlich: Alle Zeichen über ASCII-Bereich prüfen und bekannte Probleme-Zeichen ersetzen
-    # Aber normale Umlaute und Sonderzeichen beibehalten
-    problematic_chars = {
-        '☀': '[Sonne]', '☁': '[Wolke]', '⛅': '[Bewölkt]', '⛈': '[Gewitter]',
-        '⛄': '[Schneemann]', '⛅': '[Teilweise bewölkt]', '⭐': '[Stern]',
-        '⚡': '[Blitz]', '⚠': '[Warnung]', '⚽': '[Fußball]', '⚾': '[Baseball]',
-        '⛳': '[Golf]', '⛺': '[Zelt]', '⛽': '[Tankstelle]', '⛪': '[Kirche]',
-        '⌚': '[Uhr]', '⌛': '[Sanduhr]', '⏰': '[Wecker]', '⏳': '[Timer]'
-    }
-    
-    for char, replacement in problematic_chars.items():
-        text = text.replace(char, replacement)
-    
-    return text
+    # Linux/macOS - Standard-PATH verwenden
+    return pdfkit.configuration()
 
 def clean_heading_text(text):
     """Entfernt Markdown-Formatierungszeichen aus Überschriften für saubere Bookmarks"""
@@ -228,8 +85,7 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         
         # Haupttitel als Level 1
         if document_data.get('title'):
-            # Emojis auch in Bookmarks konvertieren
-            clean_title = convert_emojis_for_pdf(document_data['title'])
+            clean_title = document_data['title']
             main_bookmark = writer.add_outline_item(clean_title, 0)
             parent_bookmarks[1] = main_bookmark
         
@@ -238,8 +94,7 @@ def add_simple_bookmarks(pdf_buffer, document_data):
             # Block-Titel als Level 2
             if block.get('title'):
                 title = block['title']
-                # Emojis in Block-Titeln für Bookmarks konvertieren
-                clean_title = convert_emojis_for_pdf(title)
+                clean_title = title
                 parent = parent_bookmarks.get(1)  # Unter Haupttitel
                 block_bookmark = writer.add_outline_item(clean_title, 0, parent=parent)
                 parent_bookmarks[2] = block_bookmark
@@ -301,16 +156,15 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         return pdf_buffer
 
 def create_pdf_from_html(document_data):
-    """Erstellt ein PDF mit WeasyPrint - robuste Alternative zu Playwright"""
+    """Erstellt ein PDF mit pdfkit/wkhtmltopdf - vollständige Emoji-Unterstützung"""
     try:
         # HTML-Inhalt für Markdown zusammenbauen
         content_html = ""
         
         # Titel hinzufügen
         if document_data.get('title'):
-            # Emojis ZUERST konvertieren, dann HTML-escapen
-            title = convert_emojis_for_pdf(document_data['title'])
-            title = html.escape(title)
+            # Titel direkt verwenden - pdfkit unterstützt Emojis nativ
+            title = html.escape(document_data['title'])
             # Eindeutige ID für Bookmark-Navigation
             content_html += f'<h1 id="title-bookmark" style="color: #1e3a8a; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">{title}</h1>\n'
         
@@ -328,25 +182,23 @@ def create_pdf_from_html(document_data):
             
             # Block-Titel hinzufügen falls vorhanden
             if block_title.strip():
-                # Emojis ZUERST konvertieren, dann HTML-escapen
-                escaped_title = convert_emojis_for_pdf(block_title)
-                escaped_title = html.escape(escaped_title)
-                # H2 für bessere Gliederung - echtes HTML-Tag für WeasyPrint
+                # Titel direkt verwenden - pdfkit unterstützt Emojis nativ
+                escaped_title = html.escape(block_title)
+                # H2 für bessere Gliederung
                 content_html += f'<h2 id="block-{block_counter}" style="color: #1e3a8a; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">{escaped_title}</h2>\n'
             
             # Block-Inhalt je nach Typ verarbeiten
             if block_type == 'markdown':
                 # Markdown serverseitig zu HTML konvertieren für korrekte Überschriften
                 if block_content.strip():
-                    # Emojis vor Markdown-Konvertierung ersetzen
-                    block_content_clean = convert_emojis_for_pdf(block_content)
+                    # Markdown direkt konvertieren - pdfkit unterstützt Emojis nativ
                     
                     # Markdown zu HTML konvertieren
                     md = markdown.Markdown(extensions=[
                         'tables', 
                         'fenced_code'
                     ])
-                    html_content = md.convert(block_content_clean)
+                    html_content = md.convert(block_content)
                     
                     # Manuell IDs zu Überschriften hinzufügen für Bookmarks
                     import re
@@ -362,12 +214,11 @@ def create_pdf_from_html(document_data):
                     
                     content_html += f'{html_content}\n'
             elif block_type == 'code':
-                # Emojis ZUERST konvertieren, dann HTML-escapen
-                escaped_content = convert_emojis_for_pdf(block_content)
-                escaped_content = html.escape(escaped_content)
+                # Code direkt verwenden - pdfkit unterstützt Emojis nativ
+                escaped_content = html.escape(block_content)
                 content_html += f'<pre style="background: #f5f5f5; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 15px 0;"><code>{escaped_content}</code></pre>\n'
         
-        # HTML-Template erstellen (für Markdown mit marked.js)
+        # HTML-Template mit optimaler Emoji-Unterstützung erstellen
         full_html = f"""
         <!DOCTYPE html>
         <html lang="de">
@@ -381,7 +232,7 @@ def create_pdf_from_html(document_data):
                 }}
                 
                 body {{
-                    font-family: 'Segoe UI', Arial, sans-serif;
+                    font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Emoji', 'Segoe UI', Arial, sans-serif;
                     font-size: 11pt;
                     line-height: 1.6;
                     color: #333;
@@ -395,6 +246,7 @@ def create_pdf_from_html(document_data):
                     color: #1e3a8a !important;
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
+                    font-family: 'Noto Color Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Emoji', 'Segoe UI', Arial, sans-serif;
                 }}
                 
                 h1 {{
@@ -495,14 +347,36 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit WeasyPrint erstellen
+        # PDF mit pdfkit/wkhtmltopdf erstellen (vollständige Emoji-Unterstützung)
         try:
-            html_doc = weasyprint.HTML(string=full_html)
+            # Konfiguration für das aktuelle System
+            config = get_pdfkit_config()
+            
+            # Optionen für wkhtmltopdf mit verbesserter Emoji-Unterstützung
+            options = {
+                'page-size': 'A4',
+                'margin-top': '0.75in',
+                'margin-right': '0.75in',
+                'margin-bottom': '0.75in',
+                'margin-left': '0.75in',
+                'encoding': "UTF-8",
+                'no-outline': None,
+                'enable-local-file-access': None,
+                'disable-smart-shrinking': None,  # Verhindert Emoji-Skalierung
+                'print-media-type': None,         # Bessere CSS-Unterstützung
+                'load-error-handling': 'ignore',  # Ignoriert Schrift-Fehler
+                'load-media-error-handling': 'ignore'
+            }
+            
+            # PDF generieren mit Konfiguration
+            pdf_data = pdfkit.from_string(full_html, False, 
+                                        options=options, 
+                                        configuration=config)
             pdf_buffer = BytesIO()
-            html_doc.write_pdf(pdf_buffer)
+            pdf_buffer.write(pdf_data)
             pdf_buffer.seek(0)
         except Exception as e:
-            print(f"WeasyPrint Error: {str(e)}")
+            print(f"pdfkit Error: {str(e)}")
             # Fallback - minimales PDF
             pdf_buffer = BytesIO()
             pdf_buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
@@ -515,8 +389,8 @@ def create_pdf_from_html(document_data):
         return pdf_buffer
         
     except Exception as e:
-        # Debug-Output für WeasyPrint-Fehler
-        print(f"WEASYPRINT ERROR: {str(e)}")
+        # Debug-Output für pdfkit-Fehler
+        print(f"PDFKIT ERROR: {str(e)}")
         print(f"Error type: {type(e).__name__}")
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
