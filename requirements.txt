@@ -3,4 +3,4 @@ reportlab
 Pillow
 playwright
 gunicorn
-marked
+markdown
