@@ -16,10 +16,10 @@ keepalive = 2
 max_requests = 1000
 max_requests_jitter = 50
 
-# Logging
-accesslog = "-"
-errorlog = "-"
-loglevel = "info"
+# Production Logging
+accesslog = "/app/logs/access.log"
+errorlog = "/app/logs/error.log"
+loglevel = "info"  # info instead of debug for production
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # Process naming
@@ -32,7 +32,3 @@ pidfile = '/tmp/gunicorn.pid'
 user = None
 group = None
 tmp_upload_dir = None
-
-# SSL (if needed later)
-# keyfile = "/path/to/keyfile"
-# certfile = "/path/to/certfile"

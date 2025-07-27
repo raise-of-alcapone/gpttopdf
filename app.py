@@ -146,13 +146,11 @@ def create_pdf_from_html(document_data):
     import os
     import tempfile
     
-    # Setup logging
-    logging.basicConfig(level=logging.DEBUG)
+    # Setup production logging
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     
-    logger.info("🚀 Starting PDF generation...")
-    logger.info(f"Document title: {document_data.get('title', 'No title')}")
-    logger.info(f"Number of blocks: {len(document_data.get('blocks', []))}")
+    logger.info(f"🚀 Starting PDF generation for: {document_data.get('title', 'Untitled')}")
     
     try:
         # Build HTML content for Markdown
@@ -339,11 +337,9 @@ def create_pdf_from_html(document_data):
         """
         
         # Generate PDF with Playwright (like a real browser)
-        logger.info("🌐 Starting Playwright browser...")
+        logger.info("🌐 Launching browser for PDF generation...")
         
         with sync_playwright() as p:
-            logger.info("🚀 Launching Chromium browser...")
-            
             # Enhanced browser launch for Docker/Linux
             browser = p.chromium.launch(
                 headless=True,
@@ -362,33 +358,11 @@ def create_pdf_from_html(document_data):
                 ]
             )
             
-            logger.info("✅ Browser launched successfully")
-            
             page = browser.new_page()
-            logger.info("📄 New page created")
             
-            # Save HTML to temp file for debugging
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
-                f.write(full_html)
-                temp_html_path = f.name
-                logger.info(f"💾 HTML saved to: {temp_html_path}")
-            
-            # Load HTML
-            logger.info("📥 Loading HTML content...")
+            # Load HTML and generate PDF
             page.set_content(full_html)
-            
-            # Wait until all fonts are loaded
-            logger.info("⏳ Waiting for page to load...")
             page.wait_for_load_state('networkidle', timeout=30000)
-            logger.info("✅ Page loaded successfully")
-            
-            # Check page content
-            title = page.title()
-            logger.info(f"📖 Page title: {title}")
-            
-            # Generate PDF with high quality and outline
-            logger.info("🖨️ Generating PDF...")
-            pdf_buffer = BytesIO()
             
             pdf_bytes = page.pdf(
                 format='A4',
@@ -400,30 +374,22 @@ def create_pdf_from_html(document_data):
                 },
                 print_background=True,
                 prefer_css_page_size=True,
-                outline=False,  # Disabled, use manual bookmarks
+                outline=False,
                 display_header_footer=False
             )
             
-            logger.info(f"📊 PDF generated, size: {len(pdf_bytes)} bytes")
+            logger.info(f"✅ PDF generated successfully ({len(pdf_bytes)} bytes)")
             
             if len(pdf_bytes) == 0:
-                logger.error("❌ PDF generation failed - 0 bytes")
                 raise Exception("PDF generation resulted in empty file")
             
+            pdf_buffer = BytesIO()
             pdf_buffer.write(pdf_bytes)
             pdf_buffer.seek(0)
             
             browser.close()
-            logger.info("🔒 Browser closed")
-            
-            # Clean up temp file
-            try:
-                os.unlink(temp_html_path)
-                logger.info("🗑️ Temp HTML file cleaned up")
-            except:
-                logger.warning(f"⚠️ Could not delete temp file: {temp_html_path}")
         
-        # Add simple bookmarks - guaranteed working
+        # Add simple bookmarks
         logger.info("🔖 Adding bookmarks...")
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
         logger.info("✅ PDF generation completed successfully")
@@ -432,10 +398,6 @@ def create_pdf_from_html(document_data):
         
     except Exception as e:
         logger.error(f"❌ PDF generation failed: {str(e)}")
-        logger.error(f"Error type: {type(e).__name__}")
-        
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Create a simple fallback PDF with error message
         try:
@@ -488,63 +450,33 @@ def favicon():
 
 @app.route('/debug/test-pdf')
 def debug_test_pdf():
-    """Debug route to test PDF generation"""
-    import logging
-    import sys
-    import subprocess
-    
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger(__name__)
-    
-    debug_info = {
-        'python_version': sys.version,
-        'working_directory': os.getcwd(),
-        'environment': dict(os.environ),
-        'playwright_browsers': []
-    }
-    
-    try:
-        # Check Playwright installation
-        result = subprocess.run(['playwright', 'install', '--dry-run'], 
-                              capture_output=True, text=True)
-        debug_info['playwright_check'] = result.stdout
-    except Exception as e:
-        debug_info['playwright_error'] = str(e)
-    
+    """Debug route to test PDF generation - useful for monitoring"""
     try:
         # Test document
         test_data = {
-            'title': 'Debug Test PDF',
+            'title': 'System Health Check',
             'blocks': [
                 {
                     'type': 'markdown',
-                    'title': 'Test Block',
-                    'content': '# Test Heading\n\nThis is a test paragraph for debugging PDF generation.\n\n## Subheading\n\nAnother paragraph with **bold** and *italic* text.'
+                    'title': 'Health Check',
+                    'content': '# PDF Generation Test\n\nThis PDF was generated automatically to test system health.\n\n## Status\n\n✅ PDF generation is working correctly.\n\n**Generated:** ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
             ]
         }
-        
-        logger.info("🧪 Starting debug PDF generation...")
-        logger.info(f"Debug info: {debug_info}")
         
         pdf_buffer = create_pdf_from_html(test_data)
         
         return send_file(
             pdf_buffer,
             as_attachment=True,
-            download_name="debug_test.pdf",
+            download_name="health_check.pdf",
             mimetype='application/pdf'
         )
     except Exception as e:
-        logger.error(f"Debug PDF generation failed: {str(e)}")
-        import traceback
-        full_traceback = traceback.format_exc()
-        
         return jsonify({
             'error': str(e), 
-            'type': type(e).__name__,
-            'traceback': full_traceback,
-            'debug_info': debug_info
+            'status': 'PDF generation failed',
+            'timestamp': datetime.now().isoformat()
         }), 500
 
 @app.route('/create_pdf', methods=['POST'])
