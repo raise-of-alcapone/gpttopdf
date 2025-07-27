@@ -15,11 +15,22 @@ python -m playwright install chromium
 echo "Step 3: Creating browser symlinks..."
 cd /opt/render/.cache/ms-playwright
 
-# Create the expected directory structure
-if [ -d "chromium-1181" ] && [ ! -d "chromium_headless_shell-1181/chrome-linux" ]; then
-    echo "Creating symlink for chromium_headless_shell..."
+# Check what's already installed
+echo "Current directory contents:"
+ls -la
+
+# Create the expected directory structure and force the symlink
+if [ -d "chromium-1181" ]; then
+    echo "Found chromium-1181 directory, creating symlink..."
+    # Remove existing headless_shell if it exists
+    rm -f chromium_headless_shell-1181/chrome-linux/headless_shell
+    # Ensure directory exists
     mkdir -p chromium_headless_shell-1181/chrome-linux
+    # Create symlink from chrome to headless_shell
     ln -sf ../../chromium-1181/chrome-linux/chrome chromium_headless_shell-1181/chrome-linux/headless_shell
+    echo "Symlink created successfully"
+else
+    echo "Warning: chromium-1181 directory not found"
 fi
 
 # Step 4: Verify installation
