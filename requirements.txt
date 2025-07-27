@@ -1,0 +1,6 @@
+flask
+reportlab
+Pillow
+playwright
+gunicorn
+marked

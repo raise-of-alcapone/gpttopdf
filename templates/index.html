@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT zu PDF Converter</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="alternate icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css" rel="stylesheet">
+    <style>
+        .block-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+        .block-header {
+            background: #e9ecef;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .block-content {
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        .block-content.collapsed {
+            height: 0;
+            padding: 0 15px;
+            overflow: hidden;
+        }
+        .block-container.collapsed {
+            margin-bottom: 5px;
+        }
+        .drag-handle {
+            cursor: move;
+            color: #6c757d;
+        }
+        .block-type-badge {
+            font-size: 0.8em;
+            padding: 2px 8px;
+        }
+        .block-title {
+            border: none;
+            background: transparent;
+            flex-grow: 1;
+            margin: 0 10px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .block-title:focus {
+            background: white;
+            outline: 1px solid #007bff;
+        }
+        .block-toggle-btn {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 10px;
+        }
+        .block-toggle-btn:hover {
+            color: #007bff;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+        }
+        .sortable-chosen {
+            background: #e3f2fd;
+        }
+        .EasyMDEContainer {
+            position: relative;
+        }
+        .EasyMDEContainer .CodeMirror {
+            min-height: 150px;
+            height: auto;
+            border-radius: 4px;
+        }
+        .editor-toolbar {
+            border-radius: 4px 4px 0 0;
+            padding: 8px !important;
+        }
+        .CodeMirror-scroll {
+            overflow-y: auto !important;
+            max-height: none !important;
+        }
+        
+        .editor-toolbar .fa-table,
+        .editor-toolbar .fa-smile,
+        .editor-toolbar .fa-question-circle {
+            display: inline-block !important;
+            width: auto !important;
+            height: auto !important;
+            line-height: normal !important;
+        }
+        
+        .editor-toolbar button[title="Tabelle einfügen"],
+        .editor-toolbar button[title="Emojis & Symbole einfügen"],
+        .editor-toolbar button[title="Hilfe & Features anzeigen/ausblenden"] {
+            display: inline-block !important;
+            vertical-align: top !important;
+            margin: 0 2px !important;
+            width: auto !important;
+            height: 30px !important;
+            clear: none !important;
+        }
+        
+        #helpPanel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            border-left: 1px solid #ddd;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            z-index: 2000;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+        }
+        #helpPanel.show {
+            right: 0;
+        }
+        .help-panel-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .help-panel-content {
+            padding: 20px;
+        }
+        
+        /* PDF Vorschau Styling */
+        #previewContent h1, #previewContent h2, #previewContent h3, 
+        #previewContent h4, #previewContent h5, #previewContent h6 {
+            color: #1e3a8a !important;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        #previewContent h1 {
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 0.5rem;
+            text-align: center;
+        }
+        
+        #previewContent h2, #previewContent h3 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.3rem;
+        }
+        
+        #previewContent blockquote {
+            border-left: 4px solid #007bff;
+            margin: 1rem 0;
+            padding: 0.5rem 1rem;
+            background-color: #f8f9fa;
+            font-style: italic;
+            color: #6c757d;
+        }
+        
+        /* Globales Blockquote-Styling für alle Editoren */
+        .CodeMirror-preview blockquote,
+        blockquote {
+            border-left: 4px solid #007bff;
+            margin: 1rem 0;
+            padding: 0.5rem 1rem;
+            background-color: #f8f9fa;
+            font-style: italic;
+            color: #6c757d;
+        }
+        
+        #previewContent table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        
+        #previewContent table th, #previewContent table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        #previewContent table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        #previewContent table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* Globales Tabellen-Styling für alle Editoren */
+        .CodeMirror-preview table,
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .CodeMirror-preview table th,
+        .CodeMirror-preview table td,
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .CodeMirror-preview table th,
+        table th {
+            background-color: #e9ecef;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .CodeMirror-preview table tr:nth-child(even),
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        #previewContent pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        #previewContent code {
+            background: #f8f9fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #e83e8c;
+        }
+        
+        #previewContent pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        
+        .help-section {
+            position: sticky;
+            bottom: 20px;
+        }
+        
+        /* Custom Button Styles */
+        .btn-custom-paste {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-custom-paste:hover {
+            background: linear-gradient(135deg, #45a049, #3d8b40);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn-custom-clear {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-custom-clear:hover {
+            background: linear-gradient(135deg, #ee5a52, #d63031);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
+        }
+        
+        .btn-custom-preview {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-custom-preview:hover {
+            background: linear-gradient(135deg, #764ba2, #8e44ad);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-custom-help {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-custom-help:hover {
+            background: linear-gradient(135deg, #e67e22, #d35400);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(243, 156, 18, 0.3);
+        }
+        
+        .btn-custom-duplicate {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-custom-duplicate:hover {
+            background: linear-gradient(135deg, #2980b9, #1f6391);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+        
+        /* Hover Animation für Standard Bootstrap Buttons */
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+        }
+        
+        .btn-outline-danger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+        
+        /* Transition für alle Buttons */
+        .btn {
+            transition: all 0.3s ease;
+        }
+        
+        .main-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        .main-header h1 {
+            margin: 0;
+            font-weight: 300;
+        }
+        .main-header .btn {
+            border: 2px solid white;
+            transition: all 0.3s ease;
+        }
+        .main-header .btn:hover {
+            background: white;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="main-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-file-pdf"></i> GPT zu PDF Converter</h1>
+                    <p class="mb-0">Erstelle Mastermind PDF's aus Deinen Gesprächen mit Chat GPT!</p>
+                </div>
+                <button id="generatePDF" class="btn btn-outline-light btn-lg">
+                    <i class="fas fa-download"></i> PDF Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer">
+        <div class="row">
+            <!-- Haupt-Editor Bereich - Vollbreite -->
+            <div class="col-12">
+                <!-- Dokument-Titel -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <label for="documentTitle" class="form-label fw-bold">Dokumenttitel:</label>
+                        <input type="text" id="documentTitle" class="form-control form-control-lg" placeholder="Gib den Titel Deines Dokuments ein..." value="">
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <button id="addMarkdownBlock" class="btn btn-primary">
+                        <i class="fab fa-markdown"></i> Neuer Block
+                    </button>
+                    <button id="importFromClipboard" class="btn btn-custom-paste">
+                        <i class="fas fa-paste"></i> Aus Zwischenablage
+                    </button>
+                    <button id="clearAll" class="btn btn-custom-clear">
+                        <i class="fas fa-trash"></i> Alles löschen
+                    </button>
+                    <button id="previewPDF" class="btn btn-custom-preview">
+                        <i class="fas fa-eye"></i> Vorschau
+                    </button>
+                    <button id="toggleHelp" class="btn btn-custom-help">
+                        <i class="fas fa-question-circle"></i> Hilfe & Features
+                    </button>
+                </div>
+
+                <!-- Document Blocks Container -->
+                <div id="documentBlocks" class="mb-4">
+                    <!-- Blöcke werden hier dynamisch eingefügt -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="text-center py-5">
+                    <i class="fas fa-plus-circle fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">Willkommen beim GPT zu PDF Converter mit Markdown Unterstützung!</h4>
+                    <p class="text-muted">Füge Deinen ersten Markdown-Block hinzu, um zu beginnen.</p>
+                    <p class="small mt-3"><strong>💡 Tipp:</strong> Nutze die <i class="fas fa-eye"></i> Preview und <i class="fas fa-columns"></i> Side-by-Side Buttons in jedem Editor für eine Live-Vorschau!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hilfe-Panel -->
+    <div id="helpPanel">
+        <div class="help-panel-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-question-circle"></i> Hilfe & Features</h5>
+                <button id="closeHelp" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="help-panel-content">
+            <h6><i class="fas fa-star text-primary"></i> App Features</h6>
+            <ul class="small">
+                <li><strong>📝 Markdown Editor:</strong> Vollständige GitHub Flavored Markdown Unterstützung</li>
+                <li><strong>🚀 ChatGPT Integration:</strong> Perfekte Kompatibilität mit ChatGPT Ausgaben</li>
+                <li><strong>📋 Smart Paste:</strong> Automatische Tabellenbereinigungs-Funktion bei Strg+V</li>
+                <li><strong>🎯 Icon Picker:</strong> Über 70 Emojis & Symbole per Klick</li>
+                <li><strong>🔄 Drag & Drop:</strong> Blöcke einfach per Ziehen sortieren</li>
+                <li><strong>👁️ Live Preview:</strong> EasyMDE Preview und Side-by-Side Modus</li>
+                <li><strong>📄 PDF Export:</strong> 1:1 Formatierung wie in der Vorschau</li>
+            </ul>
+            
+            <h6><i class="fab fa-markdown text-primary"></i> Markdown Syntax</h6>
+            <div class="small">
+                <strong>Text:</strong><br>
+                <code>**fett**</code> → <strong>fett</strong><br>
+                <code>*kursiv*</code> → <em>kursiv</em><br>
+                <code>`code`</code> → <code>code</code><br><br>
+                
+                <strong>Überschriften:</strong><br>
+                <code># Überschrift 1</code><br>
+                <code>## Überschrift 2</code><br>
+                <code>### Überschrift 3</code><br><br>
+                
+                <strong>Listen:</strong><br>
+                <code>* Punkt 1</code><br>
+                <code>* Punkt 2</code><br>
+                <code>1. Nummeriert</code><br><br>
+                
+                <strong>Blockquotes:</strong><br>
+                <code>> Zitat Text</code><br><br>
+                
+                <strong>Tabellen:</strong><br>
+                <code>|Spalte 1|Spalte 2|</code><br>
+                <code>|-|-|</code><br>
+                <code>|Wert 1|Wert 2|</code><br><br>
+                
+                <strong>Links:</strong><br>
+                <code>[Text](https://...)</code><br><br>
+                
+                <strong>Trennlinien:</strong><br>
+                <code>---</code><br>
+            </div>
+            
+            <h6><i class="fas fa-lightbulb text-warning mt-3"></i> Tipps</h6>
+            <ul class="small mt-1">
+                <li>📋 <strong>ChatGPT Inhalt einfügen:</strong> Einfach Strg+V in einem Markdown-Block oder "Aus Zwischenablage" Button</li>
+                <li>🎯 <strong>Emojis einfügen:</strong> Grüner "Icons" Button neben jedem Markdown-Block</li>
+                <li>📊 <strong>Tabellen:</strong> Werden automatisch beim Einfügen bereinigt und formatiert</li>
+                <li>💻 <strong>Code-Blöcke:</strong> Verwende ```code``` für mehrzeilige oder `code` für inline Code</li>
+                <li>🔧 <strong>Block-Titel:</strong> Optional für bessere Struktur</li>
+                <li>📱 <strong>Responsive:</strong> Funktioniert auf Desktop und Mobile</li>
+                <li>👁️ <strong>Preview Modi:</strong> Nutzen Sie Preview, Side-by-Side oder Fullscreen in jedem Editor</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.10/marked.min.js"></script>
+
+    <script>
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            tables: true,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false
+        });
+
+        class AdvancedMarkdownBuilder {
+            constructor() {
+                this.blocks = new Map();
+                this.blockCounter = 0;
+                this.sortable = null;
+                this.initSortable();
+                this.bindEvents();
+            }
+
+            initSortable() {
+                const container = document.getElementById('documentBlocks');
+                this.sortable = Sortable.create(container, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen'
+                });
+            }
+
+            bindEvents() {
+                document.getElementById('addMarkdownBlock').onclick = () => this.addBlock('markdown');
+                document.getElementById('clearAll').onclick = () => this.clearAll();
+                document.getElementById('importFromClipboard').onclick = () => this.importFromClipboard();
+                document.getElementById('previewPDF').onclick = () => this.showPreview();
+                document.getElementById('generatePDF').onclick = () => this.generatePDF();
+                document.getElementById('toggleHelp').onclick = () => this.toggleHelp();
+                document.getElementById('closeHelp').onclick = () => this.toggleHelp();
+            }
+
+            toggleHelp() {
+                const helpPanel = document.getElementById('helpPanel');
+                const mainContainer = document.getElementById('mainContainer');
+                
+                if (helpPanel.classList.contains('show')) {
+                    helpPanel.classList.remove('show');
+                    mainContainer.classList.remove('help-open');
+                } else {
+                    helpPanel.classList.add('show');
+                    mainContainer.classList.add('help-open');
+                }
+            }
+
+            addBlock(type) {
+                this.blockCounter++;
+                const blockId = `block_${this.blockCounter}`;
+
+                const blockElement = document.createElement('div');
+                blockElement.className = 'block-container';
+                blockElement.setAttribute('data-block-id', blockId);
+
+                const icon = '<i class="fab fa-markdown"></i>';
+
+                blockElement.innerHTML = `
+                    <div class="block-header">
+                        <div class="d-flex align-items-center">
+                            <span class="drag-handle me-2">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                            <span class="block-type-badge badge me-2">${icon}</span>
+                            <input type="text" class="block-title" placeholder="Block-Titel (optional)">
+                            <button class="block-toggle-btn" onclick="app.toggleBlock('${blockId}')" title="Ein-/Ausklappen">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-custom-duplicate me-1" onclick="app.duplicateBlock('${blockId}')" title="Duplizieren">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteBlock('${blockId}')" title="Löschen">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="block-content">
+                        <!-- Inhalt wird hier eingefügt -->
+                    </div>
+                `;
+
+                const container = blockElement;
+                const badge = container.querySelector('.block-type-badge');
+                badge.className += ' bg-primary text-white';
+
+                const blockContent = blockElement.querySelector('.block-content');
+                let editor = null;
+                let easyMDE = null;
+
+                const textArea = document.createElement('textarea');
+                textArea.placeholder = 'Markdown-Text hier einfügen...\n\nUnterstützt alle ChatGPT Elemente:\n- **fett** und *kursiv*\n- # Überschriften\n- > Zitate\n- * Listen\n- | Tabellen |\n- ```code blöcke```\n- --- Linien\n- `inline code`\n- 🎯 Emojis';
+                blockContent.appendChild(textArea);
+                
+                const self = this;
+                const customTableButton = {
+                    name: "table",
+                    action: (editor) => {
+                        const cm = editor.codemirror;
+                        const tableMarkdown = "|Spalte 1|Spalte 2|Spalte 3|\n|-|-|-|\n|Text|Text|Text|";
+                        cm.replaceSelection(tableMarkdown);
+                        cm.focus();
+                    },
+                    className: "fa fa-table",
+                    title: "Tabelle einfügen",
+                    default: true
+                };
+                
+                const customIconButton = {
+                    name: "icons",
+                    action: (editor) => {
+                        self.showIconPicker(editor);
+                    },
+                    className: "fa fa-smile",
+                    title: "Emojis & Symbole einfügen",
+                    default: true
+                };
+                
+                const customHelpButton = {
+                    name: "help",
+                    action: (editor) => {
+                        self.toggleHelp();
+                    },
+                    className: "fa fa-question-circle",
+                    title: "Hilfe & Features anzeigen/ausblenden",
+                    default: true
+                };
+                
+                easyMDE = new EasyMDE({
+                    element: textArea,
+                    spellChecker: false,
+                    status: false,
+                    toolbar: [
+                        'bold', 'italic', 'strikethrough', '|',
+                        'heading-1', 'heading-2', 'heading-3', '|',
+                        'quote', 'unordered-list', 'ordered-list', '|',
+                        'link', 'code', '|',
+                        customIconButton, customTableButton, customHelpButton, '|',
+                        'preview', 'side-by-side', 'fullscreen'
+                    ],
+                    placeholder: 'Markdown-Text hier eingeben...',
+                    renderingConfig: {
+                        singleLineBreaks: true,
+                        codeSyntaxHighlighting: true
+                    },
+                    insertTexts: {
+                        table: ['', '\n|Spalte 1|Spalte 2|Spalte 3|\n|-|-|-|\n|Text|Text|Text|\n']
+                    }
+                });
+                
+                easyMDE.codemirror.on('paste', (cm, event) => {
+                    const clipboardData = event.clipboardData || window.clipboardData;
+                    if (clipboardData) {
+                        const pastedText = clipboardData.getData('text');
+                        
+                        // Verbesserte Tabellenerkennung: mindestens 2 | Zeichen und mindestens 2 Zeilen mit |
+                        const hasTableMarkers = pastedText.includes('|');
+                        const tableLines = pastedText.split('\n').filter(line => line.includes('|'));
+                        
+                        if (hasTableMarkers && tableLines.length >= 2) {
+                            event.preventDefault();
+                            const cleanedText = this.cleanupTablesNew(pastedText);
+                            cm.replaceSelection(cleanedText);
+                        }
+                    }
+                });
+                
+                editor = textArea;
+
+                document.getElementById('documentBlocks').appendChild(blockElement);
+
+                this.blocks.set(blockId, {
+                    type: 'markdown',
+                    editor: editor,
+                    easyMDE: easyMDE,
+                    element: container
+                });
+
+                this.updateUI();
+                
+                setTimeout(() => {
+                    easyMDE.codemirror.focus();
+                }, 100);
+            }
+
+            deleteBlock(blockId) {
+                showConfirm('Möchten Sie diesen Block wirklich löschen?', 'Block löschen', () => {
+                    const block = this.blocks.get(blockId);
+                    if (block) {
+                        if (block.easyMDE) {
+                            block.easyMDE.toTextArea();
+                        }
+                        block.element.remove();
+                        this.blocks.delete(blockId);
+                        this.updateUI();
+                    }
+                });
+            }
+
+            duplicateBlock(blockId) {
+                const block = this.blocks.get(blockId);
+                if (block) {
+                    this.addBlock('markdown');
+                    const newBlockId = `block_${this.blockCounter}`;
+                    const newBlock = this.blocks.get(newBlockId);
+                    if (newBlock) {
+                        const content = block.easyMDE ? block.easyMDE.value() : block.editor.value;
+                        
+                        if (newBlock.easyMDE) {
+                            newBlock.easyMDE.value(content);
+                        } else {
+                            newBlock.editor.value = content;
+                        }
+                        
+                        const originalTitle = block.element.querySelector('.block-title').value;
+                        const newTitle = newBlock.element.querySelector('.block-title');
+                        newTitle.value = originalTitle ? originalTitle + ' (Kopie)' : '';
+                    }
+                }
+            }
+
+            toggleBlock(blockId) {
+                const block = this.blocks.get(blockId);
+                if (block) {
+                    const blockContent = block.element.querySelector('.block-content');
+                    const toggleBtn = block.element.querySelector('.block-toggle-btn i');
+                    const blockContainer = block.element;
+                    
+                    if (blockContent.classList.contains('collapsed')) {
+                        blockContent.classList.remove('collapsed');
+                        blockContainer.classList.remove('collapsed');
+                        toggleBtn.className = 'fas fa-chevron-up';
+                    } else {
+                        blockContent.classList.add('collapsed');
+                        blockContent.classList.add('collapsed');
+                        blockContainer.classList.add('collapsed');
+                        toggleBtn.className = 'fas fa-chevron-down';
+                    }
+                }
+            }
+
+            clearAll() {
+                showConfirm('Möchten Sie wirklich alle Blöcke löschen?', 'Alle Blöcke löschen', () => {
+                    this.blocks.forEach(block => {
+                        if (block.easyMDE) {
+                            block.easyMDE.toTextArea();
+                        }
+                    });
+                    document.getElementById('documentBlocks').innerHTML = '';
+                    this.blocks.clear();
+                    document.getElementById('documentTitle').value = '';
+                    this.updateUI();
+                });
+            }
+
+            updateUI() {
+                const emptyState = document.getElementById('emptyState');
+                const hasBlocks = this.blocks.size > 0;
+                emptyState.style.display = hasBlocks ? 'none' : 'block';
+            }
+
+            // Neue, einfachere Tabellen-Bereinigung
+            cleanupTablesNew(text) {
+                // Verbesserte Tabellen-Bereinigung für ChatGPT Markdown mit Leerzeilen
+                const lines = text.split('\n');
+                const result = [];
+                let inTable = false;
+                let tableBuffer = [];
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const isTableLine = line.includes('|') && (line.match(/\|/g) || []).length >= 2;
+                    
+                    if (isTableLine) {
+                        if (!inTable) {
+                            // Tabelle beginnt - füge Leerzeile vor der Tabelle hinzu
+                            if (result.length > 0 && result[result.length - 1] !== '') {
+                                result.push('');
+                            }
+                            inTable = true;
+                        }
+                        
+                        // Bereinige die Tabellenzeile
+                        let cleanLine = line.trim();
+                        
+                        if (!cleanLine.startsWith('|')) {
+                            cleanLine = '|' + cleanLine;
+                        }
+                        if (!cleanLine.endsWith('|')) {
+                            cleanLine = cleanLine + '|';
+                        }
+                        
+                        const cells = cleanLine.split('|').map(cell => {
+                            const trimmed = cell.trim();
+                            if (trimmed.match(/^-+$/)) {
+                                return '-';
+                            }
+                            return trimmed.replace(/\s+/g, ' ');
+                        });
+                        
+                        tableBuffer.push('|' + cells.slice(1, -1).join('|') + '|');
+                    } else {
+                        if (inTable) {
+                            // Tabelle endet - füge Tabelle und Leerzeile hinzu
+                            result.push(...tableBuffer);
+                            if (line.trim() !== '') {
+                                result.push('');
+                            }
+                            tableBuffer = [];
+                            inTable = false;
+                        }
+                        result.push(line);
+                    }
+                }
+                
+                // Falls die Tabelle am Ende steht
+                if (inTable && tableBuffer.length > 0) {
+                    result.push(...tableBuffer);
+                    result.push('');
+                }
+                
+                return result.join('\n');
+            }
+
+            // Icon-Picker anzeigen
+            showIconPicker(easyMDE) {
+                const icons = {
+                    'Häufig': ['🎯', '🚀', '💡', '⭐', '✅', '❌', '⚠️', '🔥', '💪', '🎉'],
+                    'Gesichter': ['😀', '😊', '😍', '🤔', '😎', '🙄', '😅', '🤗', '🥳', '🤩', '🧘‍♂️'],
+                    'Dääämn': ['💩', '😤', '😡', '🤬', '😩', '🤦‍♂️', '🤦‍♀️', '🙈', '😱', '💀', '🤯', '😵'],
+                    'Objekte': ['📝', '📊', '📈', '💻', '🔧', '⚙️', '🛠️', '📦', '🎁', '💼', '📋'],
+                    'Symbole': ['✨', '🌟', '💫', '🔸', '🔹', '◾', '◽', '🔺', '🔻', '⬆️', '➡️', '🔍', '🔁', '🔄'],
+                    'Medizin': ['🩹', '❄️', '🧠', '🟢'],
+                    'Natur': ['🌱', '🌳', '🌊', '🔥', '⚡', '🌟', '🌈', '☀️', '🌙', '⭐'],
+                    'Transport': ['🚗', '✈️', '🚢', '🚂', '🚀', '🛸', '🚁', '🚲', '🛵', '🏃'],
+                    'Zeit': ['⏰', '⏳', '⌛', '📅', '📆', '🕒', '⏱️', '⏲️', '🔔', '📢']
+                };
+
+                // Modal erstellen
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.5); z-index: 10000; display: flex; 
+                    align-items: center; justify-content: center;
+                `;
+
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    background: white; border-radius: 8px; padding: 20px; 
+                    max-width: 600px; max-height: 80vh; overflow-y: auto;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                `;
+
+                let html = '<h4 style="margin-top: 0;">Emojis & Symbole einfügen</h4>';
+                
+                for (const [category, iconList] of Object.entries(icons)) {
+                    html += `<h6 style="margin-top: 15px; color: #666;">${category}</h6>`;
+                    html += '<div style="display: flex; flex-wrap: wrap; gap: 5px;">';
+                    iconList.forEach(icon => {
+                        html += `<button class="icon-btn" data-icon="${icon}" style="
+                            background: none; border: 1px solid #ddd; padding: 8px; 
+                            border-radius: 4px; cursor: pointer; font-size: 18px;
+                            width: 40px; height: 40px; display: flex; align-items: center; 
+                            justify-content: center;
+                        ">${icon}</button>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += '<div style="margin-top: 20px; text-align: right;"><button id="closeIconPicker" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Schließen</button></div>';
+
+                content.innerHTML = html;
+                modal.appendChild(content);
+                document.body.appendChild(modal);
+
+                // Event-Handler
+                content.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('icon-btn')) {
+                        const icon = e.target.getAttribute('data-icon');
+                        easyMDE.codemirror.replaceSelection(icon);
+                        easyMDE.codemirror.focus();
+                        document.body.removeChild(modal);
+                    }
+                    if (e.target.id === 'closeIconPicker') {
+                        document.body.removeChild(modal);
+                    }
+                });
+
+                // Hover-Effekt für Buttons
+                content.addEventListener('mouseover', (e) => {
+                    if (e.target.classList.contains('icon-btn')) {
+                        e.target.style.background = '#f8f9fa';
+                    }
+                });
+
+                content.addEventListener('mouseout', (e) => {
+                    if (e.target.classList.contains('icon-btn')) {
+                        e.target.style.background = 'none';
+                    }
+                });
+
+                // Modal schließen bei Klick außerhalb
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        document.body.removeChild(modal);
+                    }
+                });
+            }
+
+            async importFromClipboard() {
+                try {
+                    let text = await navigator.clipboard.readText();
+                    if (text.trim()) {
+                        // Tabellen automatisch bereinigen
+                        text = this.cleanupTablesNew(text);
+                        
+                        // Erstelle einen neuen Markdown-Block mit dem importierten Text
+                        this.addBlock('markdown');
+                        const newBlockId = `block_${this.blockCounter}`;
+                        const newBlock = this.blocks.get(newBlockId);
+                        if (newBlock && newBlock.editor) {
+                            if (newBlock.easyMDE) {
+                                newBlock.easyMDE.value(text);
+                            } else {
+                                newBlock.editor.value = text;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Fehler beim Zugriff auf die Zwischenablage:', err);
+                }
+            }
+
+            showPreview() {
+                const titleValue = document.getElementById('documentTitle').value.trim();
+                
+                // Sammle alle Inhalte wie bei PDF-Generierung
+                const documentData = {
+                    title: titleValue || 'DokumentOhneNamen',
+                    blocks: []
+                };
+
+                const sortedBlocks = Array.from(document.querySelectorAll('[data-block-id]'));
+                
+                sortedBlocks.forEach((element, index) => {
+                    const blockId = element.getAttribute('data-block-id');
+                    const block = this.blocks.get(blockId);
+                    const titleInput = element.querySelector('.block-title');
+                    
+                    if (block) {
+                        const content = block.easyMDE ? block.easyMDE.value().trim() : block.editor.value.trim();
+                        const blockTitle = titleInput.value.trim();
+                        
+                        if (content || blockTitle) {
+                            documentData.blocks.push({
+                                type: 'markdown',
+                                title: blockTitle,
+                                content: content
+                            });
+                        }
+                    }
+                });
+
+                if (documentData.blocks.length === 0) {
+                    showModal('Bitte fügen Sie zuerst Inhalte hinzu, um eine Vorschau anzuzeigen.', 'Warnung', 'warning');
+                    return;
+                }
+
+                // HTML für die Vorschau generieren
+                let previewHTML = '';
+                
+                // Dokumententitel
+                if (documentData.title) {
+                    previewHTML += `<h1 style="color: #1e3a8a; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">${this.escapeHtml(documentData.title)}</h1>`;
+                }
+                
+                // Blöcke verarbeiten
+                documentData.blocks.forEach((block, index) => {
+                    // Block-Titel als H2
+                    if (block.title) {
+                        previewHTML += `<h2 style="color: #1e3a8a; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">${this.escapeHtml(block.title)}</h2>`;
+                    }
+                    
+                    // Markdown zu HTML konvertieren
+                    if (block.content) {
+                        previewHTML += marked.parse(block.content);
+                    }
+                });
+                
+                // Vorschau im Modal anzeigen
+                document.getElementById('previewContent').innerHTML = previewHTML;
+                const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+                previewModal.show();
+            }
+
+            generatePDFFromPreview() {
+                // Modal schließen
+                const previewModal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+                if (previewModal) {
+                    previewModal.hide();
+                }
+                
+                // Nach kurzer Verzögerung PDF generieren (damit Modal-Animation abgeschlossen ist)
+                setTimeout(() => {
+                    this.generatePDF();
+                }, 300);
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            async generatePDF() {
+                const titleValue = document.getElementById('documentTitle').value.trim();
+                
+                try {
+                    // Sammle alle Inhalte
+                    const documentData = {
+                        title: titleValue,
+                        blocks: []
+                    };
+
+                    const sortedBlocks = Array.from(document.querySelectorAll('[data-block-id]'));
+                    
+                    sortedBlocks.forEach((element, index) => {
+                        const blockId = element.getAttribute('data-block-id');
+                        const block = this.blocks.get(blockId);
+                        const titleInput = element.querySelector('.block-title');
+                        
+                        if (block) {
+                            const content = block.easyMDE ? block.easyMDE.value().trim() : block.editor.value.trim();
+                            const blockTitle = titleInput.value.trim();
+                            
+                            if (content || blockTitle) {
+                                documentData.blocks.push({
+                                    type: 'markdown',
+                                    title: blockTitle,
+                                    content: content
+                                });
+                            }
+                        }
+                    });
+
+                    if (documentData.blocks.length === 0) {
+                        showModal('Bitte fügen Sie zuerst Inhalte hinzu, bevor Sie ein PDF erstellen.', 'Warnung', 'warning');
+                        return;
+                    }
+                    
+                    // Warnung bei fehlendem Dokumententitel
+                    if (!titleValue || titleValue === '') {
+                        showConfirm(
+                            'Das PDF wird ohne Dokumententitel erstellt. Dies kann die Navigation und Übersichtlichkeit beeinträchtigen.<br><br>Möchten Sie trotzdem fortfahren?',
+                            'Kein Dokumententitel',
+                            async () => {
+                                // PDF generieren nach Bestätigung mit Standard-Titel
+                                const documentDataWithTitle = {
+                                    ...documentData,
+                                    title: 'DokumentOhneNamen'
+                                };
+                                await this.createPDFRequest(documentDataWithTitle);
+                            }
+                        );
+                        return;
+                    }
+                    
+                    // PDF generieren
+                    await this.createPDFRequest(documentData);
+                } catch (error) {
+                    showModal('Fehler beim Erstellen des PDFs: ' + error.message, 'PDF-Fehler', 'error');
+                }
+            }
+
+            async createPDFRequest(documentData) {
+                // Button deaktivieren für 3 Sekunden
+                const pdfButton = document.getElementById('generatePDF');
+                const originalText = pdfButton.innerHTML;
+                const originalDisabled = pdfButton.disabled;
+                
+                pdfButton.disabled = true;
+                pdfButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PDF wird erstellt...';
+                
+                try {
+                    const response = await fetch('/create_pdf', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(documentData)
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `${documentData.title ? documentData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'dokument'}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        // Erfolg anzeigen
+                        pdfButton.innerHTML = '<i class="fas fa-check"></i> PDF erstellt!';
+                        pdfButton.className = 'btn btn-outline-success btn-lg';
+                    } else {
+                        const errorText = await response.text();
+                        showModal('Fehler beim Erstellen des PDFs: ' + errorText, 'PDF-Fehler', 'error');
+                        
+                        // Fehler anzeigen
+                        pdfButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Fehler!';
+                        pdfButton.className = 'btn btn-outline-danger btn-lg';
+                    }
+                } catch (error) {
+                    showModal('Fehler beim Erstellen des PDFs: ' + error.message, 'PDF-Fehler', 'error');
+                    
+                    // Fehler anzeigen
+                    pdfButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Fehler!';
+                    pdfButton.className = 'btn btn-outline-danger btn-lg';
+                }
+                
+                // Nach 3 Sekunden Button wieder aktivieren
+                setTimeout(() => {
+                    pdfButton.disabled = originalDisabled;
+                    pdfButton.innerHTML = originalText;
+                    pdfButton.className = 'btn btn-outline-light btn-lg';
+                }, 3000);
+            }
+        }
+
+        // Modal-Alert Funktion
+        function showModal(message, title = 'Hinweis', type = 'info') {
+            const modal = document.getElementById('alertModal');
+            const modalTitle = document.getElementById('alertModalTitle');
+            const modalMessage = document.getElementById('alertModalMessage');
+            const modalIcon = document.getElementById('alertModalIcon');
+            const cancelBtn = document.getElementById('alertModalCancel');
+            const okBtn = document.getElementById('alertModalOk');
+            
+            // Reset buttons
+            cancelBtn.style.display = 'none';
+            okBtn.textContent = 'OK';
+            okBtn.className = 'btn btn-primary';
+            
+            // Icon und Farbe basierend auf Typ setzen
+            switch(type) {
+                case 'error':
+                    modalIcon.className = 'fas fa-exclamation-triangle me-2 text-danger';
+                    modalTitle.textContent = title || 'Fehler';
+                    break;
+                case 'warning':
+                    modalIcon.className = 'fas fa-exclamation-circle me-2 text-warning';
+                    modalTitle.textContent = title || 'Warnung';
+                    break;
+                case 'success':
+                    modalIcon.className = 'fas fa-check-circle me-2 text-success';
+                    modalTitle.textContent = title || 'Erfolg';
+                    break;
+                default:
+                    modalIcon.className = 'fas fa-info-circle me-2 text-info';
+                    modalTitle.textContent = title || 'Hinweis';
+            }
+            
+            modalMessage.innerHTML = message;
+            
+            // Modal anzeigen
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+        }
+
+        // Modal-Confirm Funktion
+        function showConfirm(message, title = 'Bestätigung', onConfirm = null) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('alertModal');
+                const modalTitle = document.getElementById('alertModalTitle');
+                const modalMessage = document.getElementById('alertModalMessage');
+                const modalIcon = document.getElementById('alertModalIcon');
+                const cancelBtn = document.getElementById('alertModalCancel');
+                const okBtn = document.getElementById('alertModalOk');
+                
+                // Confirm-Dialog Setup
+                modalIcon.className = 'fas fa-question-circle me-2 text-warning';
+                modalTitle.textContent = title;
+                modalMessage.innerHTML = message;
+                
+                // Buttons für Confirm-Dialog
+                cancelBtn.style.display = 'inline-block';
+                okBtn.textContent = 'Ja';
+                okBtn.className = 'btn btn-danger';
+                
+                // Event Handlers
+                const handleConfirm = () => {
+                    cleanup();
+                    resolve(true);
+                    if (onConfirm) onConfirm();
+                };
+                
+                const handleCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+                
+                const cleanup = () => {
+                    okBtn.removeEventListener('click', handleConfirm);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    modal.removeEventListener('hidden.bs.modal', handleCancel);
+                };
+                
+                okBtn.addEventListener('click', handleConfirm);
+                cancelBtn.addEventListener('click', handleCancel);
+                modal.addEventListener('hidden.bs.modal', handleCancel, { once: true });
+                
+                // Modal anzeigen
+                const bootstrapModal = new bootstrap.Modal(modal);
+                bootstrapModal.show();
+            });
+        }
+
+        // App initialisieren
+        const app = new AdvancedMarkdownBuilder();
+        
+        // Dokumententitel beim Laden der Seite leeren
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('documentTitle').value = '';
+        });
+    </script>
+
+    <!-- Bootstrap Modal für Benachrichtigungen -->
+    <div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="alertModalLabel">
+                        <i id="alertModalIcon" class="fas fa-info-circle me-2"></i>
+                        <span id="alertModalTitle">Hinweis</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="alertModalMessage">Nachricht</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="alertModalCancel" style="display: none;">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="alertModalOk">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Vorschau Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="previewModalLabel">
+                        <i class="fas fa-eye me-2"></i>
+                        PDF Vorschau
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="previewContent" style="
+                        max-height: 70vh; 
+                        overflow-y: auto; 
+                        padding: 30px;
+                        background: white;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        font-size: 11pt;
+                        line-height: 1.6;
+                        color: #333;
+                    ">
+                        <!-- Vorschau-Inhalt wird hier eingefügt -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                    <button type="button" class="btn btn-primary" onclick="app.generatePDFFromPreview()">
+                        <i class="fas fa-download"></i> PDF Erstellen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
