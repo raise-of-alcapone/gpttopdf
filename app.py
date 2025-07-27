@@ -3,6 +3,11 @@ from io import BytesIO
 import re
 import html
 import markdown
+import os
+
+# Playwright Browser-Pfad VOR dem Import setzen
+os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
+
 from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter, PdfReader
 
@@ -326,9 +331,6 @@ def create_pdf_from_html(document_data):
         """
         
         # PDF mit Playwright erstellen (Browser-Engine für perfekte HTML/CSS-Darstellung)
-        import os
-        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
-        
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
