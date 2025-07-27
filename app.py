@@ -326,12 +326,11 @@ def create_pdf_from_html(document_data):
         """
         
         # PDF mit Playwright erstellen (Browser-Engine für perfekte HTML/CSS-Darstellung)
+        import os
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
+        
         with sync_playwright() as p:
-            # Explizit Browser-Pfad setzen für Render.com
-            browser = p.chromium.launch(
-                headless=True,
-                executable_path='/opt/render/.cache/ms-playwright/chromium-1181/chrome-linux/chrome'
-            )
+            browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             
             # HTML laden
