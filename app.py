@@ -3,10 +3,8 @@ from io import BytesIO
 import re
 import html
 import markdown
+from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter, PdfReader
-import weasyprint
-import tempfile
-import os
 
 app = Flask(__name__)
 
@@ -209,11 +207,11 @@ def create_pdf_from_html(document_data):
             <style>
                 @page {{
                     size: A4;
-                    margin: 1cm 2cm;
+                    margin: 0.5cm 2cm 2cm 2cm;
                 }}
                 
                 body {{
-                    font-family: Arial, sans-serif;
+                    font-family: 'Segoe UI', Arial, sans-serif;
                     font-size: 11pt;
                     line-height: 1.6;
                     color: #333;
@@ -224,41 +222,19 @@ def create_pdf_from_html(document_data):
                 
                 /* Überschriften in blau */
                 h1, h2, h3, h4, h5, h6 {{
-                    color: #1e3a8a;
+                    color: #1e3a8a !important;
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
-                    font-weight: bold;
                 }}
                 
                 h1 {{
-                    font-size: 24pt;
                     border-bottom: 2px solid #ddd;
                     padding-bottom: 0.5rem;
-                    text-align: center;
                 }}
                 
-                h2 {{
-                    font-size: 18pt;
+                h2, h3 {{
                     border-bottom: 1px solid #eee;
                     padding-bottom: 0.3rem;
-                }}
-                
-                h3 {{
-                    font-size: 16pt;
-                    border-bottom: 1px solid #eee;
-                    padding-bottom: 0.3rem;
-                }}
-                
-                h4 {{
-                    font-size: 14pt;
-                }}
-                
-                h5 {{
-                    font-size: 12pt;
-                }}
-                
-                h6 {{
-                    font-size: 11pt;
                 }}
                 
                 /* Blockquotes */
@@ -276,7 +252,7 @@ def create_pdf_from_html(document_data):
                     width: 100%;
                     border-collapse: collapse;
                     margin: 1rem 0;
-                    font-size: 10pt;
+                    font-size: 0.9rem;
                 }}
                 
                 table th, table td {{
@@ -301,11 +277,9 @@ def create_pdf_from_html(document_data):
                     border: 1px solid #e9ecef;
                     border-radius: 4px;
                     padding: 1rem;
+                    overflow-x: auto;
                     font-family: 'Courier New', monospace;
-                    font-size: 9pt;
-                    line-height: 1.4;
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
+                    font-size: 0.9rem;
                 }}
                 
                 code {{
@@ -313,7 +287,7 @@ def create_pdf_from_html(document_data):
                     padding: 0.2rem 0.4rem;
                     border-radius: 3px;
                     font-family: 'Courier New', monospace;
-                    font-size: 9pt;
+                    font-size: 0.9rem;
                     color: #e83e8c;
                 }}
                 
@@ -330,7 +304,7 @@ def create_pdf_from_html(document_data):
                 }}
                 
                 li {{
-                    margin: 0.3rem 0;
+                    margin: 0.5rem 0;
                 }}
                 
                 /* Absätze */
@@ -339,26 +313,9 @@ def create_pdf_from_html(document_data):
                     text-align: justify;
                 }}
                 
-                /* Links */
-                a {{
-                    color: #007bff;
-                    text-decoration: underline;
-                }}
-                
-                /* Fett und kursiv */
-                strong, b {{
-                    font-weight: bold;
-                }}
-                
-                em, i {{
-                    font-style: italic;
-                }}
-                
-                /* Horizontal Rules */
-                hr {{
-                    border: none;
-                    border-top: 2px solid #ddd;
-                    margin: 2rem 0;
+                /* Markdown Content Container */
+                .markdown-content {{
+                    margin-bottom: 20px;
                 }}
             </style>
         </head>
@@ -368,13 +325,36 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit WeasyPrint erstellen (HTML/CSS zu PDF wie im Browser)
-        pdf_buffer = BytesIO()
-        
-        # WeasyPrint HTML zu PDF
-        html_document = weasyprint.HTML(string=full_html)
-        html_document.write_pdf(pdf_buffer)
-        pdf_buffer.seek(0)
+        # PDF mit Playwright erstellen (wie ein echter Browser)
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            # HTML laden
+            page.set_content(full_html)
+            
+            # Warten bis alle Fonts geladen sind
+            page.wait_for_load_state('networkidle')
+            
+            # PDF generieren mit hoher Qualität und Gliederungspunkten
+            pdf_buffer = BytesIO()
+            pdf_bytes = page.pdf(
+                format='A4',
+                margin={
+                    'top': '0.5cm',
+                    'right': '2cm', 
+                    'bottom': '2cm',
+                    'left': '2cm'
+                },
+                print_background=True,
+                prefer_css_page_size=True,
+                outline=False,  # Deaktiviert, verwende manuelle Bookmarks
+                display_header_footer=False
+            )
+            pdf_buffer.write(pdf_bytes)
+            pdf_buffer.seek(0)
+            
+            browser.close()
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
@@ -382,11 +362,6 @@ def create_pdf_from_html(document_data):
         return pdf_buffer
         
     except Exception as e:
-        # Debug: Zeige den genauen Fehler
-        print(f"WeasyPrint Fehler: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
         # Einfacher Fallback - leeres PDF
         buffer = BytesIO()
         buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
@@ -429,7 +404,4 @@ def create_pdf():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') == 'development'
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=True, host='127.0.0.1', port=5000)

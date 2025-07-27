@@ -1092,12 +1092,22 @@
                 pdfButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PDF wird erstellt...';
                 
                 try {
+                    // Gerenderten HTML-Content aus dem Preview holen
+                    const previewElement = document.getElementById('preview');
+                    const renderedHTML = previewElement ? previewElement.innerHTML : '';
+                    
+                    // Daten mit gerendertem HTML erweitern
+                    const dataToSend = {
+                        ...documentData,
+                        html: renderedHTML
+                    };
+                    
                     const response = await fetch('/create_pdf', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(documentData)
+                        body: JSON.stringify(dataToSend)
                     });
 
                     if (response.ok) {
