@@ -1,6 +1,6 @@
 flask
 reportlab
 Pillow
-playwright
+pypdf
 gunicorn
 markdown
