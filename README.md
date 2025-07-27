@@ -2,6 +2,8 @@
 
 Eine moderne Flask-Webanwendung zur Erstellung professioneller PDF-Dokumente aus Markdown-Inhalten mit hierarchischen Bookmarks.
 
+🌐 **Live Demo:** https://gpt.gravityfight.de (coming soon)
+
 ## Features
 
 - 📝 **Advanced Markdown Editor** mit EasyMDE
@@ -11,6 +13,8 @@ Eine moderne Flask-Webanwendung zur Erstellung professioneller PDF-Dokumente aus
 - 📄 **PDF-Export** mit Playwright (hochwertige Ausgabe)
 - 🔖 **Hierarchische Bookmarks** für Navigation
 - 💻 **Responsive Web-Interface**
+- 🔒 **Production-Ready** mit Docker & Nginx
+- ⚡ **Smart Caching** für schnelle Deployments
 
 ## Installation
 

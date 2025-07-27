@@ -56,6 +56,9 @@ echo "📋 Recent logs:"
 docker-compose logs --tail=20 gpttopdf
 
 echo "✅ Deployment completed!"
+echo "🌐 App running at: http://localhost:5000"
+echo "🔗 Public URL: https://gpt.gravityfight.de (after DNS + SSL setup)"
+echo ""
 echo "🐛 For debugging: docker-compose logs -f gpttopdf"
 echo "🧪 Test PDF generation: curl http://localhost:5000/debug/test-pdf -o test.pdf"
 echo ""
