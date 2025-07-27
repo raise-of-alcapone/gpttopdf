@@ -327,19 +327,6 @@ def create_pdf_from_html(document_data):
         
         # PDF mit Playwright erstellen (Browser-Engine für perfekte HTML/CSS-Darstellung)
         import os
-        import subprocess
-        
-        # Chromium zur Laufzeit installieren falls nicht vorhanden
-        try:
-            # Versuche Browser-Installation
-            result = subprocess.run(['playwright', 'install', 'chromium'], 
-                                 capture_output=True, text=True, timeout=120)
-            print(f"Browser installation: {result.stdout}")
-            if result.stderr:
-                print(f"Browser installation errors: {result.stderr}")
-        except Exception as install_error:
-            print(f"Browser installation failed: {install_error}")
-        
         os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
         
         with sync_playwright() as p:
