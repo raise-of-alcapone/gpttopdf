@@ -8,6 +8,142 @@ from pypdf import PdfWriter, PdfReader
 
 app = Flask(__name__)
 
+# Emoji-zu-Text-Mapping für bessere PDF-Darstellung
+EMOJI_TO_TEXT = {
+    # Häufig verwendete
+    '🎯': '[Ziel]',
+    '🚀': '[Rakete]',
+    '💡': '[Idee]',
+    '⭐': '[Stern]',
+    '✅': '[Häkchen]',
+    '❌': '[Kreuz]',
+    '⚠️': '[Warnung]',
+    '🔥': '[Feuer]',
+    '💪': '[Stark]',
+    '🎉': '[Party]',
+    
+    # Gesichter
+    '😀': '[Lachen]',
+    '😊': '[Lächeln]',
+    '😍': '[Verliebt]',
+    '🤔': '[Nachdenken]',
+    '😎': '[Cool]',
+    '🙄': '[Augenrollen]',
+    '😅': '[Nervös]',
+    '🤗': '[Umarmung]',
+    '🥳': '[Feier]',
+    '🤩': '[Begeistert]',
+    '🧘‍♂️': '[Meditation]',
+    
+    # Negativ
+    '💩': '[Mist]',
+    '😤': '[Wütend]',
+    '😡': '[Zorn]',
+    '🤬': '[Fluchen]',
+    '😩': '[Erschöpft]',
+    '🤦‍♂️': '[Facepalm-M]',
+    '🤦‍♀️': '[Facepalm-W]',
+    '🙈': '[Nichts-sehen]',
+    '😱': '[Schock]',
+    '💀': '[Totenkopf]',
+    '🤯': '[Explodiert]',
+    '😵': '[Benommen]',
+    
+    # Objekte
+    '📝': '[Notiz]',
+    '📊': '[Diagramm]',
+    '📈': '[Wachstum]',
+    '💻': '[Computer]',
+    '🔧': '[Werkzeug]',
+    '⚙️': '[Einstellung]',
+    '🛠️': '[Reparatur]',
+    '📦': '[Paket]',
+    '🎁': '[Geschenk]',
+    '💼': '[Koffer]',
+    '📋': '[Klemmbrett]',
+    
+    # Symbole
+    '✨': '[Glitzer]',
+    '🌟': '[Glänzend]',
+    '💫': '[Schwindelig]',
+    '🔸': '[Orange-Punkt]',
+    '🔹': '[Blau-Punkt]',
+    '◾': '[Schwarz-Punkt]',
+    '◽': '[Weiß-Punkt]',
+    '🔺': '[Dreieck-hoch]',
+    '🔻': '[Dreieck-runter]',
+    '⬆️': '[Pfeil-hoch]',
+    '➡️': '[Pfeil-rechts]',
+    '🔍': '[Lupe]',
+    '🔁': '[Wiederholen]',
+    '🔄': '[Aktualisieren]',
+    
+    # Medizin
+    '🩹': '[Pflaster]',
+    '❄️': '[Schnee]',
+    '🧠': '[Gehirn]',
+    '🟢': '[Grün-Kreis]',
+    
+    # Natur
+    '🌱': '[Sämling]',
+    '🌳': '[Baum]',
+    '🌊': '[Welle]',
+    '⚡': '[Blitz]',
+    '🌈': '[Regenbogen]',
+    '☀️': '[Sonne]',
+    '🌙': '[Mond]',
+    
+    # Transport
+    '🚗': '[Auto]',
+    '✈️': '[Flugzeug]',
+    '🚢': '[Schiff]',
+    '🚂': '[Zug]',
+    '🛸': '[UFO]',
+    '🚁': '[Hubschrauber]',
+    '🚲': '[Fahrrad]',
+    '🛵': '[Roller]',
+    '🏃': '[Laufen]',
+    
+    # Zeit
+    '⏰': '[Wecker]',
+    '⏳': '[Sanduhr]',
+    '⌛': '[Sanduhr-leer]',
+    '📅': '[Kalender]',
+    '📆': '[Kalender-Blatt]',
+    '🕒': '[3-Uhr]',
+    '⏱️': '[Stoppuhr]',
+    '⏲️': '[Timer]',
+    '🔔': '[Glocke]',
+    '📢': '[Megafon]'
+}
+
+def convert_emojis_for_pdf(text):
+    """Konvertiert Emojis zu lesbarem Text für PDF-Darstellung"""
+    if not text:
+        return text
+    
+    # Emoji-zu-Text-Ersetzung
+    for emoji, replacement in EMOJI_TO_TEXT.items():
+        text = text.replace(emoji, replacement)
+    
+    # Fallback für unbekannte Emojis: Entferne sie oder ersetze sie durch [Emoji]
+    # Unicode-Emojis erkennen und entfernen/ersetzen
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # Emoticons
+        "\U0001F300-\U0001F5FF"  # Symbols & Pictographs
+        "\U0001F680-\U0001F6FF"  # Transport & Map
+        "\U0001F1E0-\U0001F1FF"  # Flags
+        "\U00002702-\U000027B0"  # Dingbats
+        "\U000024C2-\U0001F251"  # Enclosed characters
+        "]+", flags=re.UNICODE
+    )
+    
+    # Unbekannte Emojis durch [Emoji] ersetzen
+    text = emoji_pattern.sub('[Emoji]', text)
+    
+    return text
+
 def clean_heading_text(text):
     """Entfernt Markdown-Formatierungszeichen aus Überschriften für saubere Bookmarks"""
     if not text:
@@ -71,7 +207,9 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         
         # Haupttitel als Level 1
         if document_data.get('title'):
-            main_bookmark = writer.add_outline_item(document_data['title'], 0)
+            # Emojis auch in Bookmarks konvertieren
+            clean_title = convert_emojis_for_pdf(document_data['title'])
+            main_bookmark = writer.add_outline_item(clean_title, 0)
             parent_bookmarks[1] = main_bookmark
         
         # Durch alle Blöcke gehen
@@ -79,8 +217,10 @@ def add_simple_bookmarks(pdf_buffer, document_data):
             # Block-Titel als Level 2
             if block.get('title'):
                 title = block['title']
+                # Emojis in Block-Titeln für Bookmarks konvertieren
+                clean_title = convert_emojis_for_pdf(title)
                 parent = parent_bookmarks.get(1)  # Unter Haupttitel
-                block_bookmark = writer.add_outline_item(title, 0, parent=parent)
+                block_bookmark = writer.add_outline_item(clean_title, 0, parent=parent)
                 parent_bookmarks[2] = block_bookmark
                 
                 # Alle tieferen Level zurücksetzen
@@ -148,6 +288,8 @@ def create_pdf_from_html(document_data):
         # Titel hinzufügen
         if document_data.get('title'):
             title = html.escape(document_data['title'])
+            # Emojis für PDF konvertieren
+            title = convert_emojis_for_pdf(title)
             # Eindeutige ID für Bookmark-Navigation
             content_html += f'<h1 id="title-bookmark" style="color: #1e3a8a; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">{title}</h1>\n'
         
@@ -166,19 +308,24 @@ def create_pdf_from_html(document_data):
             # Block-Titel hinzufügen falls vorhanden
             if block_title.strip():
                 escaped_title = html.escape(block_title)
-                # H2 für bessere Gliederung - echtes HTML-Tag für Playwright
+                # Emojis für PDF konvertieren
+                escaped_title = convert_emojis_for_pdf(escaped_title)
+                # H2 für bessere Gliederung - echtes HTML-Tag für WeasyPrint
                 content_html += f'<h2 id="block-{block_counter}" style="color: #1e3a8a; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">{escaped_title}</h2>\n'
             
             # Block-Inhalt je nach Typ verarbeiten
             if block_type == 'markdown':
                 # Markdown serverseitig zu HTML konvertieren für korrekte Überschriften
                 if block_content.strip():
+                    # Emojis vor Markdown-Konvertierung ersetzen
+                    block_content_clean = convert_emojis_for_pdf(block_content)
+                    
                     # Markdown zu HTML konvertieren
                     md = markdown.Markdown(extensions=[
                         'tables', 
                         'fenced_code'
                     ])
-                    html_content = md.convert(block_content)
+                    html_content = md.convert(block_content_clean)
                     
                     # Manuell IDs zu Überschriften hinzufügen für Bookmarks
                     import re
@@ -195,6 +342,8 @@ def create_pdf_from_html(document_data):
                     content_html += f'{html_content}\n'
             elif block_type == 'code':
                 escaped_content = html.escape(block_content)
+                # Emojis auch in Code-Blöcken konvertieren
+                escaped_content = convert_emojis_for_pdf(escaped_content)
                 content_html += f'<pre style="background: #f5f5f5; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4; overflow-x: auto; margin: 15px 0;"><code>{escaped_content}</code></pre>\n'
         
         # HTML-Template erstellen (für Markdown mit marked.js)
