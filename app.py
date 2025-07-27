@@ -6,7 +6,12 @@ import markdown
 from pypdf import PdfWriter, PdfReader
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-# from playwright.sync_api import sync_playwright  # Temporarily disabled for deployment
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.units import cm
+from reportlab.lib.colors import blue, black
+import textwrap
+from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 
@@ -328,56 +333,35 @@ def create_pdf_from_html(document_data):
         """
         
         # PDF mit Playwright erstellen (wie ein echter Browser)
-        # Temporarily disabled for deployment - using simple fallback
-        # with sync_playwright() as p:
-        #     browser = p.chromium.launch(headless=True)
-        #     page = browser.new_page()
-        #     
-        #     # HTML laden
-        #     page.set_content(full_html)
-        #     
-        #     # Warten bis alle Fonts geladen sind
-        #     page.wait_for_load_state('networkidle')
-        #     
-        #     # PDF generieren mit hoher Qualität und Gliederungspunkten
-        #     pdf_buffer = BytesIO()
-        #     pdf_bytes = page.pdf(
-        #         format='A4',
-        #         margin={
-        #             'top': '0.5cm',
-        #             'right': '2cm', 
-        #             'bottom': '2cm',
-        #             'left': '2cm'
-        #         },
-        #         print_background=True,
-        #         prefer_css_page_size=True,
-        #         outline=False,  # Deaktiviert, verwende manuelle Bookmarks
-        #         display_header_footer=False
-        #     )
-        #     pdf_buffer.write(pdf_bytes)
-        #     pdf_buffer.seek(0)
-        #     
-        #     browser.close()
-        
-        # Simple fallback PDF generation (temporary)
-        pdf_buffer = BytesIO()
-        # Create minimal PDF with content
-        
-        c = canvas.Canvas(pdf_buffer, pagesize=A4)
-        width, height = A4
-        
-        # Add title if available
-        if document_data.get('title'):
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(50, height - 50, document_data['title'])
-        
-        # Add simple content note
-        c.setFont("Helvetica", 12)
-        c.drawString(50, height - 100, "PDF generation temporarily simplified for deployment.")
-        c.drawString(50, height - 120, "Advanced PDF features will be restored after successful deployment.")
-        
-        c.save()
-        pdf_buffer.seek(0)
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            # HTML laden
+            page.set_content(full_html)
+            
+            # Warten bis alle Fonts geladen sind
+            page.wait_for_load_state('networkidle')
+            
+            # PDF generieren mit hoher Qualität und Gliederungspunkten
+            pdf_buffer = BytesIO()
+            pdf_bytes = page.pdf(
+                format='A4',
+                margin={
+                    'top': '0.5cm',
+                    'right': '2cm', 
+                    'bottom': '2cm',
+                    'left': '2cm'
+                },
+                print_background=True,
+                prefer_css_page_size=True,
+                outline=False,  # Deaktiviert, verwende manuelle Bookmarks
+                display_header_footer=False
+            )
+            pdf_buffer.write(pdf_bytes)
+            pdf_buffer.seek(0)
+            
+            browser.close()
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
