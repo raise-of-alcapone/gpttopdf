@@ -1,25 +1,49 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting pdfkit/wkhtmltopdf build process ==="
+echo "=== Starting pdfkit/wkhtmltopdf build process for Render.com ==="
 
-# Step 1: Update package list
-echo "Step 1: Updating package list..."
-apt-get update
+# Check if we're on Render.com (has specific environment)
+if [ -n "$RENDER" ] || [ -n "$RENDER_SERVICE_NAME" ]; then
+    echo "Detected Render.com environment"
+    
+    # On Render.com, we need to use the package manager differently
+    echo "Installing wkhtmltopdf via render packages..."
+    
+    # Try to install wkhtmltopdf if available in the system
+    if command -v wkhtmltopdf &> /dev/null; then
+        echo "✅ wkhtmltopdf already available!"
+        wkhtmltopdf --version
+    else
+        echo "⚠️ wkhtmltopdf not found - will try to continue with Python packages only"
+        echo "Note: This may require manual package configuration on Render.com"
+    fi
+else
+    echo "Local development environment detected"
+    
+    # For local Linux development
+    if command -v apt-get &> /dev/null; then
+        echo "Installing via apt-get..."
+        sudo apt-get update
+        sudo apt-get install -y wkhtmltopdf xvfb fonts-noto-color-emoji fonts-noto-emoji
+    elif command -v yum &> /dev/null; then
+        echo "Installing via yum..."
+        sudo yum install -y wkhtmltopdf xorg-x11-server-Xvfb
+    else
+        echo "Package manager not found - please install wkhtmltopdf manually"
+    fi
+fi
 
-# Step 2: Install wkhtmltopdf for pdfkit with color emoji support
-echo "Step 2: Installing wkhtmltopdf with dependencies..."
-apt-get install -y wkhtmltopdf xvfb
-
-# Step 3: Install font packages for better emoji support
-echo "Step 3: Installing emoji fonts..."
-apt-get install -y fonts-noto-color-emoji fonts-noto-emoji
-
-# Step 4: Install Python packages
-echo "Step 4: Installing Python packages..."
+# Install Python packages (this should work on Render.com)
+echo "Installing Python packages..."
 pip install -r requirements.txt
 
 echo "=== Build process completed successfully ==="
-echo "wkhtmltopdf version:"
-wkhtmltopdf --version
-echo "Available emoji fonts installed!"
+
+# Test if wkhtmltopdf is available
+if command -v wkhtmltopdf &> /dev/null; then
+    echo "✅ wkhtmltopdf is available:"
+    wkhtmltopdf --version
+else
+    echo "⚠️ wkhtmltopdf not found - app may need fallback configuration"
+fi

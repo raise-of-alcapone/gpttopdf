@@ -10,16 +10,44 @@ from pathlib import Path
 
 app = Flask(__name__)
 
-# pdfkit-Konfiguration für Windows
+# pdfkit-Konfiguration für Windows und Linux/Render.com
 def get_pdfkit_config():
-    """Konfiguriert pdfkit basierend auf dem Betriebssystem"""
-    if os.name == 'nt':  # Windows
-        # Standard Windows-Installationspfad
+    """Konfiguriert pdfkit basierend auf dem Betriebssystem und Umgebung"""
+    
+    # Render.com / Linux Environment
+    if os.name == 'posix':  # Linux/Unix
+        # Standard Linux-Pfade prüfen
+        possible_linux_paths = [
+            '/usr/bin/wkhtmltopdf',
+            '/usr/local/bin/wkhtmltopdf',
+            '/opt/bin/wkhtmltopdf'
+        ]
+        
+        for path in possible_linux_paths:
+            if os.path.exists(path):
+                print(f"✅ wkhtmltopdf gefunden: {path}")
+                return pdfkit.configuration(wkhtmltopdf=path)
+        
+        # Fallback: PATH verwenden
+        try:
+            import subprocess
+            result = subprocess.run(['which', 'wkhtmltopdf'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                path = result.stdout.strip()
+                print(f"✅ wkhtmltopdf im PATH gefunden: {path}")
+                return pdfkit.configuration(wkhtmltopdf=path)
+        except:
+            pass
+    
+    # Windows Environment    
+    elif os.name == 'nt':  # Windows
         wkhtmltopdf_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
         if os.path.exists(wkhtmltopdf_path):
             return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
     
-    # Linux/macOS - Standard-PATH verwenden
+    # Default fallback
+    print("⚠️ Verwende Standard-pdfkit-Konfiguration")
     return pdfkit.configuration()
 
 def clean_heading_text(text):
@@ -375,13 +403,54 @@ def create_pdf_from_html(document_data):
             pdf_buffer = BytesIO()
             pdf_buffer.write(pdf_data)
             pdf_buffer.seek(0)
+            
+            print("✅ PDF erfolgreich mit pdfkit erstellt")
+            
         except Exception as e:
-            print(f"pdfkit Error: {str(e)}")
-            # Fallback - minimales PDF
-            pdf_buffer = BytesIO()
-            pdf_buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
-            pdf_buffer.seek(0)
-            return pdf_buffer
+            print(f"❌ pdfkit Error: {str(e)}")
+            print("🔄 Versuche Fallback-Lösung...")
+            
+            # Fallback: Erstelle ein einfaches HTML-basiertes PDF
+            try:
+                # Vereinfachte HTML-Version für Fallback
+                simple_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>PDF Fallback</title>
+                    <style>
+                        body {{ 
+                            font-family: Arial, sans-serif; 
+                            padding: 20px; 
+                            line-height: 1.6; 
+                        }}
+                        h1 {{ color: #1e3a8a; }}
+                    </style>
+                </head>
+                <body>
+                    <h1>⚠️ PDF Fallback Mode</h1>
+                    <p>Das ursprüngliche PDF konnte nicht erstellt werden.</p>
+                    <p>Grund: wkhtmltopdf nicht verfügbar auf diesem System.</p>
+                    <hr>
+                    {content_html}
+                </body>
+                </html>
+                """
+                
+                # Minimales PDF erstellen
+                pdf_buffer = BytesIO()
+                pdf_buffer.write(simple_html.encode('utf-8'))
+                pdf_buffer.seek(0)
+                print("⚠️ Fallback-HTML erstellt")
+                
+            except Exception as fallback_error:
+                print(f"❌ Auch Fallback fehlgeschlagen: {fallback_error}")
+                # Letzter Fallback - minimales PDF
+                pdf_buffer = BytesIO()
+                pdf_buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
+                pdf_buffer.seek(0)
+                return pdf_buffer
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
