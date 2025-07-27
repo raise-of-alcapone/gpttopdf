@@ -4,16 +4,9 @@ import re
 import html
 import markdown
 from pypdf import PdfWriter, PdfReader
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.units import cm
-from reportlab.lib.colors import blue, black, darkblue
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
-import textwrap
-import re as regex
-# from playwright.sync_api import sync_playwright
+import weasyprint
+import tempfile
+import os
 
 app = Flask(__name__)
 
@@ -148,60 +141,6 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         pdf_buffer.seek(0)
         return pdf_buffer
 
-def convert_html_to_reportlab(html_content):
-    """Konvertiert HTML zu reportlab-kompatiblen Paragraph-Objekten"""
-    import re
-    
-    # HTML-Tags entfernen und in Textblöcke aufteilen
-    paragraphs = []
-    
-    # Code-Blöcke extrahieren
-    code_pattern = r'<pre><code[^>]*>(.*?)</code></pre>'
-    code_blocks = re.findall(code_pattern, html_content, re.DOTALL)
-    
-    # Code-Blöcke temporär ersetzen
-    temp_html = html_content
-    for i, code in enumerate(code_blocks):
-        temp_html = temp_html.replace(f'<pre><code>{code}</code></pre>', f'{{CODE_BLOCK_{i}}}', 1)
-        temp_html = temp_html.replace(f'<pre><code class="language-python">{code}</code></pre>', f'{{CODE_BLOCK_{i}}}', 1)
-    
-    # Überschriften extrahieren
-    heading_pattern = r'<h([1-6])[^>]*>(.*?)</h[1-6]>'
-    headings = re.findall(heading_pattern, temp_html, re.DOTALL)
-    
-    # Überschriften temporär ersetzen
-    for level, heading in headings:
-        clean_heading = re.sub(r'<[^>]+>', '', heading).strip()
-        temp_html = temp_html.replace(f'<h{level}>{heading}</h{level}>', f'{{HEADING_{clean_heading}}}', 1)
-    
-    # Paragraphen aufteilen
-    temp_html = re.sub(r'<[^>]+>', '', temp_html)  # Alle HTML-Tags entfernen
-    parts = temp_html.split('\n')
-    
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-            
-        # Code-Blöcke wieder einsetzen
-        if '{CODE_BLOCK_' in part:
-            code_index = int(re.search(r'CODE_BLOCK_(\d+)', part).group(1))
-            if code_index < len(code_blocks):
-                code_text = code_blocks[code_index].strip()
-                paragraphs.append({'type': 'code', 'text': code_text})
-        # Überschriften wieder einsetzen
-        elif '{HEADING_' in part:
-            heading_text = part.replace('{HEADING_', '').replace('}', '')
-            paragraphs.append({'type': 'heading', 'text': heading_text})
-        # Normaler Text
-        else:
-            # Markdown-Formatierung beibehalten
-            part = part.replace('**', '<b>').replace('**', '</b>')
-            part = part.replace('*', '<i>').replace('*', '</i>')
-            paragraphs.append({'type': 'normal', 'text': part})
-    
-    return paragraphs
-
 def create_pdf_from_html(document_data):
     """Erstellt ein PDF direkt aus HTML/CSS - für Advanced Markdown Editor"""
     try:
@@ -270,22 +209,22 @@ def create_pdf_from_html(document_data):
             <style>
                 @page {{
                     size: A4;
-                    margin: 0.5cm 2cm 2cm 2cm;
+                    margin: 1cm 2cm;
                 }}
                 
                 body {{
-                    font-family: 'Segoe UI', Arial, sans-serif;
+                    font-family: Arial, sans-serif;
                     font-size: 11pt;
                     line-height: 1.6;
                     color: #333;
                     margin: 0;
-                    padding: 20px;
+                    padding: 0;
                     background: white;
                 }}
                 
                 /* Überschriften in blau */
                 h1, h2, h3, h4, h5, h6 {{
-                    color: #1e3a8a !important;
+                    color: #1e3a8a;
                     margin-top: 1.5rem;
                     margin-bottom: 1rem;
                 }}
@@ -300,48 +239,13 @@ def create_pdf_from_html(document_data):
                     padding-bottom: 0.3rem;
                 }}
                 
-                /* Blockquotes */
-                blockquote {{
-                    border-left: 4px solid #007bff;
-                    margin: 1rem 0;
-                    padding: 0.5rem 1rem;
-                    background-color: #f8f9fa;
-                    font-style: italic;
-                    color: #6c757d;
-                }}
-                
-                /* Tabellen */
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 1rem 0;
-                    font-size: 0.9rem;
-                }}
-                
-                table th, table td {{
-                    border: 1px solid #ddd;
-                    padding: 8px 12px;
-                    text-align: left;
-                }}
-                
-                table th {{
-                    background-color: #f8f9fa;
-                    font-weight: bold;
-                    color: #495057;
-                }}
-                
-                table tr:nth-child(even) {{
-                    background-color: #f8f9fa;
-                }}
-                
                 /* Code */
                 pre {{
                     background: #f8f9fa;
                     border: 1px solid #e9ecef;
                     border-radius: 4px;
                     padding: 1rem;
-                    overflow-x: auto;
-                    font-family: 'Courier New', monospace;
+                    font-family: monospace;
                     font-size: 0.9rem;
                 }}
                 
@@ -349,36 +253,14 @@ def create_pdf_from_html(document_data):
                     background: #f8f9fa;
                     padding: 0.2rem 0.4rem;
                     border-radius: 3px;
-                    font-family: 'Courier New', monospace;
+                    font-family: monospace;
                     font-size: 0.9rem;
                     color: #e83e8c;
-                }}
-                
-                pre code {{
-                    background: none;
-                    padding: 0;
-                    color: inherit;
-                }}
-                
-                /* Listen */
-                ul, ol {{
-                    margin: 1rem 0;
-                    padding-left: 2rem;
-                }}
-                
-                li {{
-                    margin: 0.5rem 0;
                 }}
                 
                 /* Absätze */
                 p {{
                     margin-bottom: 1rem;
-                    text-align: justify;
-                }}
-                
-                /* Markdown Content Container */
-                .markdown-content {{
-                    margin-bottom: 20px;
                 }}
             </style>
         </head>
@@ -388,96 +270,12 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit reportlab erstellen - vollständige Markdown-Unterstützung
+        # PDF mit WeasyPrint erstellen (HTML/CSS zu PDF wie im Browser)
         pdf_buffer = BytesIO()
-        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
-                               rightMargin=2*cm, leftMargin=2*cm,
-                               topMargin=1*cm, bottomMargin=2*cm)
         
-        # Styles definieren
-        styles = getSampleStyleSheet()
-        
-        # Custom Styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            spaceAfter=30,
-            textColor=darkblue,
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
-        )
-        
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            spaceAfter=12,
-            spaceBefore=20,
-            textColor=darkblue,
-            fontName='Helvetica-Bold'
-        )
-        
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=11,
-            spaceAfter=12,
-            alignment=TA_JUSTIFY,
-            fontName='Helvetica'
-        )
-        
-        code_style = ParagraphStyle(
-            'CustomCode',
-            parent=styles['Code'],
-            fontSize=9,
-            spaceAfter=12,
-            leftIndent=20,
-            fontName='Courier',
-            backColor='#f5f5f5'
-        )
-        
-        # Story-Array für PDF-Inhalt
-        story = []
-        
-        # Titel hinzufügen
-        if document_data.get('title'):
-            story.append(Paragraph(document_data['title'], title_style))
-            story.append(Spacer(1, 20))
-        
-        # Blöcke verarbeiten
-        for block in document_data.get('blocks', []):
-            block_type = block.get('type', 'markdown')
-            block_content = block.get('content', '')
-            block_title = block.get('title', '')
-            
-            if not block_content.strip() and not block_title.strip():
-                continue
-            
-            # Block-Titel hinzufügen
-            if block_title.strip():
-                story.append(Paragraph(block_title, heading_style))
-            
-            if block_content.strip():
-                # Markdown zu HTML konvertieren
-                html_content = markdown.markdown(block_content, extensions=['tables', 'fenced_code'])
-                
-                # HTML zu reportlab-kompatiblem Text konvertieren
-                processed_content = convert_html_to_reportlab(html_content)
-                
-                # Absätze hinzufügen
-                for paragraph in processed_content:
-                    if paragraph['type'] == 'heading':
-                        story.append(Paragraph(paragraph['text'], heading_style))
-                    elif paragraph['type'] == 'code':
-                        story.append(Paragraph(paragraph['text'], code_style))
-                    else:
-                        story.append(Paragraph(paragraph['text'], normal_style))
-            
-            story.append(Spacer(1, 15))
-        
-        # PDF erstellen
-        doc.build(story)
+        # WeasyPrint HTML zu PDF
+        html_document = weasyprint.HTML(string=full_html)
+        html_document.write_pdf(pdf_buffer)
         pdf_buffer.seek(0)
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
@@ -486,6 +284,11 @@ def create_pdf_from_html(document_data):
         return pdf_buffer
         
     except Exception as e:
+        # Debug: Zeige den genauen Fehler
+        print(f"WeasyPrint Fehler: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
         # Einfacher Fallback - leeres PDF
         buffer = BytesIO()
         buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')

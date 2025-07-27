@@ -1,6 +1,5 @@
 flask
-reportlab
-Pillow
+weasyprint
 pypdf
 gunicorn
 markdown
