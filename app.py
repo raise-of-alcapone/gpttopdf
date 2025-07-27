@@ -362,6 +362,12 @@ def create_pdf_from_html(document_data):
         return pdf_buffer
         
     except Exception as e:
+        # Debug-Output für Playwright-Fehler
+        print(f"PLAYWRIGHT ERROR: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        
         # Einfacher Fallback - leeres PDF
         buffer = BytesIO()
         buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
