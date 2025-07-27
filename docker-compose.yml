@@ -8,7 +8,6 @@ services:
       # Enable BuildKit for better caching
       cache_from:
         - gpttopdf:latest
-      target: production
     image: gpttopdf:latest
     container_name: gpttopdf
     ports:
