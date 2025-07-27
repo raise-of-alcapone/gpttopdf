@@ -536,7 +536,7 @@ def create_pdf():
         # Derive filename from title
         title = document_data.get('title', '').strip()
         if not title:
-            title = 'DocumentWithoutName'
+            title = 'Dokument ohne Namen'
         safe_title = re.sub(r'[^\w\s-]', '', title).strip()
         safe_title = re.sub(r'[-\s]+', '_', safe_title)
         filename = f"{safe_title or 'document'}.pdf"
