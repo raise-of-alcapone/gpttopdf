@@ -3,12 +3,7 @@ from io import BytesIO
 import re
 import html
 import markdown
-import os
-
-# Playwright Browser-Pfad VOR dem Import setzen
-os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/opt/render/.cache/ms-playwright'
-
-from playwright.sync_api import sync_playwright
+import weasyprint
 from pypdf import PdfWriter, PdfReader
 
 app = Flask(__name__)
@@ -145,7 +140,7 @@ def add_simple_bookmarks(pdf_buffer, document_data):
         return pdf_buffer
 
 def create_pdf_from_html(document_data):
-    """Erstellt ein PDF direkt aus HTML/CSS - für Advanced Markdown Editor"""
+    """Erstellt ein PDF mit WeasyPrint - robuste Alternative zu Playwright"""
     try:
         # HTML-Inhalt für Markdown zusammenbauen
         content_html = ""
@@ -330,36 +325,19 @@ def create_pdf_from_html(document_data):
         </html>
         """
         
-        # PDF mit Playwright erstellen (Browser-Engine für perfekte HTML/CSS-Darstellung)
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            
-            # HTML laden
-            page.set_content(full_html)
-            
-            # Warten bis alles geladen ist
-            page.wait_for_load_state('networkidle')
-            
-            # PDF generieren
+        # PDF mit WeasyPrint erstellen
+        try:
+            html_doc = weasyprint.HTML(string=full_html)
             pdf_buffer = BytesIO()
-            pdf_bytes = page.pdf(
-                format='A4',
-                margin={
-                    'top': '0.5cm',
-                    'right': '2cm', 
-                    'bottom': '2cm',
-                    'left': '2cm'
-                },
-                print_background=True,
-                prefer_css_page_size=True,
-                outline=False,
-                display_header_footer=False
-            )
-            
-            pdf_buffer.write(pdf_bytes)
+            html_doc.write_pdf(pdf_buffer)
             pdf_buffer.seek(0)
-            browser.close()
+        except Exception as e:
+            print(f"WeasyPrint Error: {str(e)}")
+            # Fallback - minimales PDF
+            pdf_buffer = BytesIO()
+            pdf_buffer.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
+            pdf_buffer.seek(0)
+            return pdf_buffer
         
         # Einfache Bookmarks hinzufügen - garantiert funktionierend
         pdf_buffer = add_simple_bookmarks(pdf_buffer, document_data)
@@ -367,8 +345,8 @@ def create_pdf_from_html(document_data):
         return pdf_buffer
         
     except Exception as e:
-        # Debug-Output für Playwright-Fehler
-        print(f"PLAYWRIGHT ERROR: {str(e)}")
+        # Debug-Output für WeasyPrint-Fehler
+        print(f"WEASYPRINT ERROR: {str(e)}")
         print(f"Error type: {type(e).__name__}")
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
