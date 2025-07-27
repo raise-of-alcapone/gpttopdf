@@ -505,14 +505,6 @@ def create_pdf():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    import os
-    # Production vs Development
-    debug_mode = os.getenv('FLASK_ENV') != 'production'
-    
-    if debug_mode:
-        # Development mode with Flask dev server
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    else:
-        # Production mode - should be run with Gunicorn
-        print("Production mode detected. Please use Gunicorn:")
-        print("gunicorn --config gunicorn.conf.py app:app")
+    # This should only be used for local development
+    # In production, use Gunicorn via Docker
+    app.run(debug=True, host='0.0.0.0', port=5000)
