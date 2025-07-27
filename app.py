@@ -7,8 +7,28 @@ from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter, PdfReader
 from datetime import datetime
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 app = Flask(__name__)
+
+# Security configurations
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
+
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; font-src 'self' cdnjs.cloudflare.com; img-src 'self' data:;"
+    return response
 
 def clean_heading_text(text):
     """Remove Markdown formatting from headings for clean bookmarks"""
@@ -482,8 +502,34 @@ def debug_test_pdf():
 @app.route('/create_pdf', methods=['POST'])
 def create_pdf():
     """Modern PDF generation for Advanced Markdown Editor"""
+    logger = logging.getLogger(__name__)
+    client_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    
     try:
+        # Content-Type validation
+        if not request.is_json:
+            logger.warning(f"Invalid content-type from {client_ip}")
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
         document_data = request.json
+        
+        # Input validation
+        if not document_data:
+            logger.warning(f"Empty request from {client_ip}")
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Size validation (prevent DoS)
+        content_size = len(str(document_data))
+        if content_size > 10 * 1024 * 1024:  # 10MB limit
+            logger.warning(f"Oversized request ({content_size} bytes) from {client_ip}")
+            return jsonify({'error': 'Content too large (max 10MB)'}), 413
+        
+        # Validate structure
+        if not isinstance(document_data, dict):
+            logger.warning(f"Invalid data format from {client_ip}")
+            return jsonify({'error': 'Invalid data format'}), 400
+        
+        logger.info(f"PDF generation request from {client_ip}, size: {content_size} bytes")
         
         pdf_buffer = create_pdf_from_html(document_data)
         
@@ -495,6 +541,8 @@ def create_pdf():
         safe_title = re.sub(r'[-\s]+', '_', safe_title)
         filename = f"{safe_title or 'document'}.pdf"
         
+        logger.info(f"PDF generated successfully for {client_ip}: {filename}")
+        
         return send_file(
             pdf_buffer,
             as_attachment=True,
@@ -502,7 +550,8 @@ def create_pdf():
             mimetype='application/pdf'
         )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"PDF generation failed for {client_ip}: {str(e)}")
+        return jsonify({'error': 'PDF generation failed'}), 500
 
 if __name__ == '__main__':
     # This should only be used for local development
