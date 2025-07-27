@@ -25,4 +25,4 @@ services:
       retries: 3
       start_period: 40s
     # Add shared memory for Chromium
-    shm_size: 2gb
+    shm_size: 512m
