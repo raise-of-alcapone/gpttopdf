@@ -4,9 +4,10 @@ services:
   gpttopdf:
     build: .
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"  # Nur lokal erreichbar
     environment:
       - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
@@ -16,3 +17,5 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    # Add shared memory for Chromium
+    shm_size: 2gb
