@@ -243,7 +243,7 @@ def create_pdf_from_html(document_data):
                 
                 body {{
                     font-family: 'Segoe UI', Arial, sans-serif;
-                    font-size: 11pt;
+                    font-size: 9pt;
                     line-height: 1.6;
                     color: #333;
                     margin: 0;
@@ -283,7 +283,7 @@ def create_pdf_from_html(document_data):
                     width: 100%;
                     border-collapse: collapse;
                     margin: 1rem 0;
-                    font-size: 0.9rem;
+                    font-size: 0.7rem;
                 }}
                 
                 table th, table td {{
