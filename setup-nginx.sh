@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Nginx Setup Script for GPTtoPDF with SNI
-# Domain: gpt.gravityfight.de
+# Domain: blockz.gravityfight.de
 
 set -e
 
-echo "🌐 Setting up Nginx for gpt.gravityfight.de..."
+echo "🌐 Setting up Nginx for blockz.gravityfight.de..."
 
 # Install Nginx if not installed
 if ! command -v nginx &> /dev/null; then
@@ -14,16 +14,16 @@ if ! command -v nginx &> /dev/null; then
     sudo apt install -y nginx
 fi
 
-# Create Nginx configuration for gpt.gravityfight.de
+# Create Nginx configuration for blockz.gravityfight.de
 echo "⚙️ Creating Nginx configuration..."
-sudo tee /etc/nginx/sites-available/gpt.gravityfight.de > /dev/null <<'EOF'
+sudo tee /etc/nginx/sites-available/blockz.gravityfight.de > /dev/null <<'EOF'
 # Rate limiting zones
 limit_req_zone $binary_remote_addr zone=general:10m rate=10r/m;
 limit_req_zone $binary_remote_addr zone=pdf:10m rate=3r/m;
 
 server {
     listen 80;
-    server_name gpt.gravityfight.de;
+    server_name blockz.gravityfight.de;
 
     # Large file uploads for PDFs
     client_max_body_size 50M;
@@ -96,7 +96,7 @@ EOF
 
 # Enable the site
 echo "🔗 Enabling Nginx site..."
-sudo ln -sf /etc/nginx/sites-available/gpt.gravityfight.de /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/blockz.gravityfight.de /etc/nginx/sites-enabled/
 
 # Remove default site if it exists
 sudo rm -f /etc/nginx/sites-enabled/default
@@ -115,11 +115,11 @@ echo "📊 Nginx status:"
 sudo systemctl status nginx --no-pager
 
 echo "✅ Nginx setup completed!"
-echo "🌐 Your app should now be available at: http://gpt.gravityfight.de"
+echo "🌐 Your app should now be available at: http://blockz.gravityfight.de"
 echo "🔧 Docker app runs on localhost:5000 (internal)"
-echo "🌍 Nginx forwards gpt.gravityfight.de to Docker app"
+echo "🌍 Nginx forwards blockz.gravityfight.de to Docker app"
 echo ""
 echo "🔒 Next steps:"
-echo "   1. Make sure DNS A-Record gpt.gravityfight.de points to this server"
-echo "   2. Test: curl -H 'Host: gpt.gravityfight.de' http://localhost"
-echo "   3. Setup SSL with: sudo certbot --nginx -d gpt.gravityfight.de"
+echo "   1. Make sure DNS A-Record blockz.gravityfight.de points to this server"
+echo "   2. Test: curl -H 'Host: blockz.gravityfight.de' http://localhost"
+echo "   3. Setup SSL with: sudo certbot --nginx -d blockz.gravityfight.de"
